@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import sys
+
+if __package__ in {None, ""}:
+    backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if backend_root not in sys.path:
+        sys.path.insert(0, backend_root)
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
