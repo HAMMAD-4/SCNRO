@@ -1,0 +1,44 @@
+name: scnro
+description: Smart Campus Navigation & Resource Optimizer for PUCIT
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP client
+  http: ^1.2.0
+
+  # Map rendering
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+
+  # State management
+  provider: ^6.1.2
+
+  # Persistent local storage
+  shared_preferences: ^2.2.3
+
+  # Image loading
+  cached_network_image: ^3.3.1
+
+  # UI extras
+  cupertino_icons: ^1.0.6
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
