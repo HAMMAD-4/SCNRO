@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from contextlib import asynccontextmanager
+
+if __package__ in {None, ""}:
+    backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if backend_root not in sys.path:
+        sys.path.insert(0, backend_root)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
