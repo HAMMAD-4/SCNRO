@@ -8,17 +8,16 @@ from pathlib import Path
 
 
 def test_main_module_runs_as_script_without_import_error():
-    main_path = Path(__file__).resolve().parents[1] / "app" / "main.py"
-    backend_root = main_path.parent.parent
-    app_dir = main_path.parent
+    script_path = Path(__file__).resolve().parents[1] / "app" / "main.py"
+    backend_root = script_path.parent.parent
+    app_dir = script_path.parent
 
     original_sys_path = sys.path.copy()
     try:
-        sys.path = [str(app_dir)] + [
-            path
-            for path in original_sys_path
-            if Path(path).resolve() not in {backend_root, app_dir}
+        sys.path = [
+            str(app_dir),
+            *[path for path in original_sys_path if Path(path).resolve() != backend_root],
         ]
-        runpy.run_path(str(main_path), run_name="__main__")
+        runpy.run_path(str(script_path), run_name="__main__")
     finally:
         sys.path = original_sys_path
