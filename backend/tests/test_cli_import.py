@@ -7,10 +7,10 @@ import sys
 from pathlib import Path
 
 
-def test_main_module_runs_as_script_without_import_error():
+def test_main_runs_as_script_without_import_error():
     script_path = Path(__file__).resolve().parents[1] / "app" / "main.py"
-    backend_root = script_path.parent.parent
-    app_dir = script_path.parent
+    backend_root = script_path.parent.parent.resolve()
+    app_dir = script_path.parent.resolve()
 
     original_sys_path = sys.path.copy()
     try:
