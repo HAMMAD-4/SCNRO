@@ -377,8 +377,8 @@
       <div class="section-title">Available Rooms &amp; Labs <small>Ranked by proximity &amp; free time</small></div>
       <div class="card" style="padding:14px">
         <div class="input-row">
-          <input id="user-lat" class="grow" type="number" step="any" placeholder="Your latitude (default: PUCIT)" value="31.4826" />
-          <input id="user-lng" class="grow" type="number" step="any" placeholder="Your longitude" value="74.3036" />
+          <input id="user-lat" class="grow" type="number" step="any" placeholder="Your latitude (default: PUCIT)" value="31.4826" aria-label="Your latitude" />
+          <input id="user-lng" class="grow" type="number" step="any" placeholder="Your longitude" value="74.3036" aria-label="Your longitude" />
           <button class="btn btn-primary" onclick="loadRooms()">🔄 Refresh</button>
         </div>
       </div>
@@ -417,8 +417,8 @@
         <div class="card-title"><span class="icon">➕</span> Report an Item</div>
         <div class="form-grid">
           <div class="form-field">
-            <label>Item Name *</label>
-            <input id="lf-name" placeholder="e.g. Black Wallet" />
+            <label for="lf-name">Item Name *</label>
+            <input id="lf-name" placeholder="e.g. Black Wallet" required aria-required="true" />
           </div>
           <div class="form-field">
             <label>Status *</label>
@@ -469,6 +469,11 @@
 ══════════════════════════════════════════════════════════ */
 
 const API = ''; // same origin
+
+/* ── App constants ── */
+const DEFAULT_USER_ID = 1;          // placeholder user ID (app has no auth layer)
+const MAX_FREE_MINUTES = 120;       // cap used to calculate the free-time bar width
+const TAB_SWITCH_DELAY_MS = 300;    // ms to wait after tab switch before pre-filling nav form
 
 /* ── Utilities ── */
 function toast(msg, ms = 3000) {
@@ -583,7 +588,7 @@ async function loadDashboard() {
 let _roomsLoaded = false;
 
 function roomCard(r) {
-  const pct = Math.min(100, (r.free_minutes / 120) * 100);
+  const pct = Math.min(100, (r.free_minutes / MAX_FREE_MINUTES) * 100);
   const freeText = r.free_minutes >= 999 ? 'Free all day' : `Free for ${r.free_minutes} min`;
   const badge = r.category === 'Lab' ? 'badge-blue' : 'badge-green';
   return `
@@ -627,7 +632,7 @@ function navigateToRoom(id, name) {
       sel.value = id;
       getPath();
     }
-  }, 300);
+  }, TAB_SWITCH_DELAY_MS);
 }
 
 /* ══════════════════════════════════════════
@@ -852,7 +857,7 @@ async function reportItem() {
 
   try {
     await apiPost('/api/v1/items/report', {
-      user_id: 1,
+      user_id: DEFAULT_USER_ID,
       item_name: name,
       status,
       description: desc || undefined,
@@ -915,7 +920,7 @@ function searchFaculty(query) {
     } catch (e) {
       setHtml('faculty-container', errHtml(e.message));
     }
-  }, 300);
+  }, TAB_SWITCH_DELAY_MS);
 }
 
 /* ══════════════════════════════════════════

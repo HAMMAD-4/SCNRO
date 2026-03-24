@@ -8,6 +8,8 @@ from app.models import Base, Faculty, Location, Schedule
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
+    # Default to SQLite for zero-config local development.
+    # Set DATABASE_URL=postgresql://... for staging / production deployments.
     "sqlite:///./scnro_dev.db",
 )
 
@@ -25,7 +27,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def _seed(db) -> None:
     """Insert sample PUCIT data if the database is empty."""
-    if db.query(Location).count() > 0:
+    if db.query(Location).first() is not None:
         return  # already seeded
 
     locations = [
