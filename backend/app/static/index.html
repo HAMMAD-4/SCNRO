@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SCNRO – Smart Campus Navigation & Resource Optimizer</title>
+<style>
+  :root {
+    --primary: #1565C0;
+    --primary-dark: #0D47A1;
+    --primary-light: #E3F2FD;
+    --accent: #FF6F00;
+    --green: #2E7D32;
+    --red: #C62828;
+    --amber: #F57F17;
+    --bg: #F5F7FA;
+    --card: #FFFFFF;
+    --border: #E0E0E0;
+    --text: #212121;
+    --muted: #757575;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── App Shell ── */
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    background: var(--primary);
+    color: white;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  header .brand { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+  header .brand span { opacity: 0.7; font-weight: 400; font-size: 0.85rem; margin-left: 8px; }
+  #health-dot { width: 10px; height: 10px; border-radius: 50%; background: #aaa; display: inline-block; margin-right: 6px; }
+  #health-dot.online { background: #69F0AE; }
+
+  nav {
+    background: var(--primary-dark);
+    display: flex;
+    gap: 2px;
+    padding: 0 16px;
+  }
+  nav button {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    padding: 12px 18px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+  }
+  nav button:hover { color: white; background: rgba(255,255,255,0.07); }
+  nav button.active { color: white; border-bottom-color: #82B1FF; }
+
+  main { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .icon { font-size: 1.2rem; }
+
+  /* ── Grid ── */
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .badge-green { background: #E8F5E9; color: var(--green); }
+  .badge-red { background: #FFEBEE; color: var(--red); }
+  .badge-amber { background: #FFF8E1; color: var(--amber); }
+  .badge-blue { background: var(--primary-light); color: var(--primary); }
+  .badge-grey { background: #F5F5F5; color: var(--muted); }
+
+  /* ── Inputs ── */
+  .input-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  input, select, textarea {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+    background: white;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+  input.grow, select.grow { flex: 1; min-width: 120px; }
+  textarea { width: 100%; resize: vertical; min-height: 70px; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-outline { background: white; color: var(--primary); border: 1px solid var(--primary); }
+  .btn-outline:hover { background: var(--primary-light); }
+  .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-success { background: var(--green); color: white; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Loading / Empty ── */
+  .spinner {
+    display: flex; justify-content: center; align-items: center;
+    padding: 40px;
+  }
+  .spinner::after {
+    content: '';
+    width: 36px; height: 36px;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+  .empty .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .error-msg { background: #FFEBEE; color: var(--red); border: 1px solid #FFCDD2; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 0.88rem; }
+
+  /* ── Room card ── */
+  .room-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    position: relative;
+    transition: box-shadow 0.15s;
+  }
+  .room-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .room-card .room-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
+  .room-card .room-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
+  .room-card .free-bar {
+    height: 4px;
+    background: #E0E0E0;
+    border-radius: 2px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .room-card .free-bar-fill { height: 100%; background: var(--green); border-radius: 2px; }
+  .room-score { position: absolute; top: 14px; right: 14px; font-size: 0.75rem; color: var(--muted); }
+
+  /* ── Faculty card ── */
+  .faculty-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    transition: box-shadow 0.15s;
+  }
+  .faculty-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .avatar {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .faculty-info .name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+  .faculty-info .designation { font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
+  .faculty-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Lost Found card ── */
+  .lf-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 4px solid transparent;
+    border-radius: var(--radius);
+    padding: 16px;
+    transition: box-shadow 0.15s;
+  }
+  .lf-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .lf-card.Lost { border-left-color: var(--red); }
+  .lf-card.Found { border-left-color: var(--green); }
+  .lf-card.Claimed { border-left-color: var(--muted); opacity: 0.7; }
+  .lf-card .item-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
+  .lf-card .item-desc { font-size: 0.83rem; color: var(--muted); margin-bottom: 10px; }
+  .lf-card .item-meta { font-size: 0.75rem; color: var(--muted); }
+
+  /* ── Navigation UI ── */
+  .path-container {
+    background: var(--primary-light);
+    border: 1px solid #90CAF9;
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 12px;
+  }
+  .path-nodes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .path-node {
+    background: var(--primary);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+  .path-arrow { color: var(--primary); font-size: 1.1rem; margin: 0 4px; }
+
+  /* ── Map placeholder (canvas-based) ── */
+  #nav-canvas {
+    width: 100%;
+    height: 280px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: #EFF3FF;
+    display: block;
+    cursor: crosshair;
+  }
+
+  /* ── Dashboard summary row ── */
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--primary); line-height: 1; }
+  .stat-card .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+  .form-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .form-field input, .form-field select, .form-field textarea { width: 100%; }
+
+  /* ── Tabs hidden ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: #323232; color: white; padding: 12px 24px; border-radius: 24px;
+    font-size: 0.88rem; z-index: 1000; transition: transform 0.25s; pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Filter chips ── */
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 500;
+    border: 1px solid var(--border); background: white; cursor: pointer; transition: all 0.12s;
+  }
+  .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .chip:hover:not(.active) { background: var(--primary-light); border-color: #90CAF9; }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-title small { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
+
+  @media (max-width: 600px) {
+    main { padding: 12px; }
+    nav button { padding: 10px 10px; font-size: 0.78rem; }
+    header .brand span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      🎓 SCNRO <span>Smart Campus · PUCIT</span>
+    </div>
+    <div style="display:flex;align-items:center;font-size:0.8rem;color:rgba(255,255,255,0.8)">
+      <span id="health-dot"></span>
+      <span id="health-label">Connecting…</span>
+    </div>
+  </header>
+
+  <nav id="nav-tabs">
+    <button class="active" onclick="switchTab('dashboard',this)">🏠 Dashboard</button>
+    <button onclick="switchTab('rooms',this)">🚪 Free Rooms</button>
+    <button onclick="switchTab('navigate',this)">🗺️ Navigate</button>
+    <button onclick="switchTab('lostfound',this)">🔍 Lost &amp; Found</button>
+    <button onclick="switchTab('faculty',this)">👩‍🏫 Faculty</button>
+  </nav>
+
+  <main>
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div id="tab-dashboard" class="tab-panel active">
+      <div class="section-title">
+        Live Campus Overview
+        <small id="dash-time"></small>
+      </div>
+
+      <div class="stat-row" id="stat-row">
+        <div class="stat-card"><div class="val" id="stat-free">–</div><div class="lbl">Free Rooms</div></div>
+        <div class="stat-card"><div class="val" id="stat-lost">–</div><div class="lbl">Lost Items</div></div>
+        <div class="stat-card"><div class="val" id="stat-found">–</div><div class="lbl">Found Items</div></div>
+        <div class="stat-card"><div class="val" id="stat-faculty">–</div><div class="lbl">Faculty Listed</div></div>
+      </div>
+
+      <div class="section-title" style="margin-top:4px">
+        Top Free Rooms Right Now
+        <button class="btn btn-outline btn-sm" onclick="switchTab('rooms', document.querySelector('[onclick*=rooms]'))">See all →</button>
+      </div>
+      <div id="dash-rooms" class="grid grid-3"></div>
+
+      <div class="section-title" style="margin-top:20px">
+        Recent Lost &amp; Found Posts
+        <button class="btn btn-outline btn-sm" onclick="switchTab('lostfound', document.querySelector('[onclick*=lostfound]'))">See all →</button>
+      </div>
+      <div id="dash-lf"></div>
+    </div>
+
+    <!-- ═══ FREE ROOMS ═══ -->
+    <div id="tab-rooms" class="tab-panel">
+      <div class="section-title">Available Rooms &amp; Labs <small>Ranked by proximity &amp; free time</small></div>
+      <div class="card" style="padding:14px">
+        <div class="input-row">
+          <input id="user-lat" class="grow" type="number" step="any" placeholder="Your latitude (default: PUCIT)" value="31.4826" />
+          <input id="user-lng" class="grow" type="number" step="any" placeholder="Your longitude" value="74.3036" />
+          <button class="btn btn-primary" onclick="loadRooms()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div id="rooms-container"></div>
+    </div>
+
+    <!-- ═══ NAVIGATE ═══ -->
+    <div id="tab-navigate" class="tab-panel">
+      <div class="section-title">Indoor Navigation <small>Shortest path using Dijkstra</small></div>
+      <div class="card">
+        <div class="input-row">
+          <select id="nav-from" class="grow">
+            <option value="1">Main Entrance (default start)</option>
+          </select>
+          <select id="nav-to" class="grow">
+            <option value="">– Select destination –</option>
+          </select>
+          <button class="btn btn-primary" onclick="getPath()">📍 Find Path</button>
+        </div>
+        <div id="nav-result"></div>
+        <div id="nav-map-wrap" style="margin-top:14px;display:none">
+          <canvas id="nav-canvas"></canvas>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:6px;text-align:center">
+            Campus node map — blue = start, red = end, highlighted nodes = path
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LOST & FOUND ═══ -->
+    <div id="tab-lostfound" class="tab-panel">
+      <div class="section-title">Community Board <small>Report or find lost items</small></div>
+
+      <!-- Report form -->
+      <div class="card">
+        <div class="card-title"><span class="icon">➕</span> Report an Item</div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Item Name *</label>
+            <input id="lf-name" placeholder="e.g. Black Wallet" />
+          </div>
+          <div class="form-field">
+            <label>Status *</label>
+            <select id="lf-status">
+              <option value="Lost">Lost</option>
+              <option value="Found">Found</option>
+            </select>
+          </div>
+          <div class="form-field" style="grid-column:1/-1">
+            <label>Description</label>
+            <textarea id="lf-desc" placeholder="Describe the item — colour, brand, contents…"></textarea>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:4px" onclick="reportItem()">Submit Report</button>
+      </div>
+
+      <!-- Filter + list -->
+      <div class="chips">
+        <span class="chip active" onclick="filterLF(null,this)">All</span>
+        <span class="chip" onclick="filterLF('Lost',this)">Lost</span>
+        <span class="chip" onclick="filterLF('Found',this)">Found</span>
+        <span class="chip" onclick="filterLF('Claimed',this)">Claimed</span>
+      </div>
+      <div id="lf-container"></div>
+    </div>
+
+    <!-- ═══ FACULTY ═══ -->
+    <div id="tab-faculty" class="tab-panel">
+      <div class="section-title">Faculty Directory <small>Search by name</small></div>
+      <div class="input-row">
+        <input id="faculty-search" class="grow" placeholder="Type a name, e.g. Ahmed…" oninput="searchFaculty(this.value)" />
+        <button class="btn btn-primary" onclick="searchFaculty(document.getElementById('faculty-search').value)">🔍 Search</button>
+      </div>
+      <div id="faculty-container">
+        <div class="empty"><div class="icon">👩‍🏫</div>Type a name above to search faculty</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   SCNRO Web Client
+   Communicates with the FastAPI backend at the same origin.
+══════════════════════════════════════════════════════════ */
+
+const API = ''; // same origin
+
+/* ── Utilities ── */
+function toast(msg, ms = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+async function apiFetch(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: r.statusText }));
+    throw new Error(err.detail || r.statusText);
+  }
+  return r.json();
+}
+
+function setHtml(id, html) { document.getElementById(id).innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+function errHtml(msg) { return `<div class="error-msg">⚠️ ${msg}</div>`; }
+
+/* ── Tab switching ── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  // Lazy-load on first visit
+  if (name === 'rooms' && !_roomsLoaded) loadRooms();
+  if (name === 'lostfound' && !_lfLoaded) loadLF();
+  if (name === 'navigate' && !_navLoaded) loadNavLocations();
+}
+
+/* ══════════════════════════════════════════
+   HEALTH CHECK
+══════════════════════════════════════════ */
+async function checkHealth() {
+  try {
+    const d = await apiFetch('/health');
+    document.getElementById('health-dot').className = 'online';
+    document.getElementById('health-label').textContent = 'Backend online';
+  } catch {
+    document.getElementById('health-label').textContent = 'Backend offline';
+  }
+}
+
+/* ══════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════ */
+async function loadDashboard() {
+  // Live clock
+  setInterval(() => {
+    document.getElementById('dash-time').textContent = new Date().toLocaleTimeString();
+  }, 1000);
+
+  try {
+    const [rooms, lostItems, foundItems] = await Promise.all([
+      apiFetch('/api/v1/resources/available?user_lat=31.4826&user_lng=74.3036'),
+      apiFetch('/api/v1/items?status=Lost'),
+      apiFetch('/api/v1/items?status=Found'),
+    ]);
+
+    document.getElementById('stat-free').textContent = rooms.available_rooms.length;
+    document.getElementById('stat-lost').textContent = lostItems.items.length;
+    document.getElementById('stat-found').textContent = foundItems.items.length;
+
+    // Top 3 rooms
+    const top3 = rooms.available_rooms.slice(0, 3);
+    setHtml('dash-rooms', top3.length
+      ? top3.map(roomCard).join('')
+      : '<div class="empty"><div class="icon">✅</div>All rooms are currently in use</div>');
+
+    // Recent LF
+    const recent = [...lostItems.items, ...foundItems.items]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 3);
+    setHtml('dash-lf', recent.length
+      ? recent.map(lfCard).join('')
+      : '<div class="empty"><div class="icon">📋</div>No items reported yet</div>');
+  } catch (e) {
+    document.getElementById('dash-rooms').innerHTML = errHtml('Could not load data: ' + e.message);
+  }
+
+  // Faculty count
+  try {
+    const fac = await apiFetch('/api/v1/faculty/search?name=');
+    document.getElementById('stat-faculty').textContent = fac.faculty?.length ?? '–';
+  } catch {
+    // try a broad search
+    try {
+      const fac = await apiFetch('/api/v1/faculty/search?name=a');
+      document.getElementById('stat-faculty').textContent = fac.faculty?.length ?? '–';
+    } catch { /* ignore */ }
+  }
+}
+
+/* ══════════════════════════════════════════
+   ROOMS
+══════════════════════════════════════════ */
+let _roomsLoaded = false;
+
+function roomCard(r) {
+  const pct = Math.min(100, (r.free_minutes / 120) * 100);
+  const freeText = r.free_minutes >= 999 ? 'Free all day' : `Free for ${r.free_minutes} min`;
+  const badge = r.category === 'Lab' ? 'badge-blue' : 'badge-green';
+  return `
+  <div class="room-card">
+    <span class="room-score">#${r.location_id}</span>
+    <div class="room-name">${r.name}</div>
+    <div class="room-meta">
+      🏢 ${r.wing_name || '–'} · Floor ${r.floor_level ?? '?'}<br>
+      📏 ${r.distance_m.toFixed(0)} m away · ${freeText}
+      ${r.free_until ? ` (until ${r.free_until})` : ''}
+    </div>
+    <div class="free-bar"><div class="free-bar-fill" style="width:${pct}%"></div></div>
+    <span class="badge ${badge}">${r.category || 'Room'}</span>
+    <button class="btn btn-outline btn-sm" style="float:right"
+      onclick="navigateToRoom(${r.location_id}, '${r.name.replace(/'/g,"\\'")}')">Navigate</button>
+  </div>`;
+}
+
+async function loadRooms() {
+  _roomsLoaded = true;
+  const lat = parseFloat(document.getElementById('user-lat')?.value || '31.4826');
+  const lng = parseFloat(document.getElementById('user-lng')?.value || '74.3036');
+  setHtml('rooms-container', spinner());
+  try {
+    const data = await apiFetch(`/api/v1/resources/available?user_lat=${lat}&user_lng=${lng}`);
+    const rooms = data.available_rooms;
+    setHtml('rooms-container', rooms.length
+      ? `<div class="grid grid-3">${rooms.map(roomCard).join('')}</div>`
+      : '<div class="empty"><div class="icon">🎓</div>All rooms are currently occupied</div>');
+  } catch (e) {
+    setHtml('rooms-container', errHtml(e.message));
+  }
+}
+
+function navigateToRoom(id, name) {
+  // switch to navigate tab and pre-fill destination
+  switchTab('navigate', document.querySelector('[onclick*=navigate]'));
+  setTimeout(() => {
+    const sel = document.getElementById('nav-to');
+    if (sel) {
+      sel.value = id;
+      getPath();
+    }
+  }, 300);
+}
+
+/* ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ */
+let _navLoaded = false;
+
+// Hard-coded location list (mirrors seed data; also fetched dynamically)
+const LOCATIONS = {
+  1: 'Main Entrance',
+  2: 'CS Block Corridor',
+  3: 'Computer Lab 1',
+  4: 'Computer Lab 2',
+  5: 'Computer Lab 3',
+  6: 'Computer Lab 4',
+  7: 'Seminar Hall',
+  8: 'Faculty Block',
+  9: 'Dean Office',
+  10: 'Cafeteria',
+  11: 'Lecture Hall A',
+  12: 'Lecture Hall B',
+  13: 'Library',
+  14: 'Project Room 1',
+  15: 'Project Room 2',
+};
+
+// Node positions for canvas rendering (scaled to canvas)
+const NODE_POS = {
+  1:  { x: 0.30, y: 0.60 },
+  2:  { x: 0.45, y: 0.50 },
+  3:  { x: 0.58, y: 0.40 },
+  4:  { x: 0.62, y: 0.46 },
+  5:  { x: 0.66, y: 0.52 },
+  6:  { x: 0.70, y: 0.36 },
+  7:  { x: 0.42, y: 0.42 },
+  8:  { x: 0.72, y: 0.44 },
+  9:  { x: 0.80, y: 0.38 },
+  10: { x: 0.20, y: 0.70 },
+  11: { x: 0.84, y: 0.42 },
+  12: { x: 0.88, y: 0.36 },
+  13: { x: 0.15, y: 0.55 },
+  14: { x: 0.82, y: 0.52 },
+  15: { x: 0.86, y: 0.58 },
+};
+
+const EDGES = [[1,2],[1,10],[2,3],[2,4],[2,7],[3,4],[4,5],[5,6],[2,8],[8,9]];
+
+function loadNavLocations() {
+  _navLoaded = true;
+  const fromSel = document.getElementById('nav-from');
+  const toSel = document.getElementById('nav-to');
+  Object.entries(LOCATIONS).forEach(([id, name]) => {
+    if (id !== '1') {
+      const o1 = new Option(name, id);
+      fromSel.appendChild(o1);
+    }
+    const o2 = new Option(name + ` (#${id})`, id);
+    toSel.appendChild(o2);
+  });
+  drawCampusMap([]);
+}
+
+async function getPath() {
+  const from = document.getElementById('nav-from').value;
+  const to = document.getElementById('nav-to').value;
+  if (!to) { toast('Please select a destination'); return; }
+  if (from === to) { toast('Origin and destination are the same'); return; }
+
+  setHtml('nav-result', spinner());
+  document.getElementById('nav-map-wrap').style.display = 'none';
+
+  try {
+    const data = await apiFetch(`/api/v1/navigate?to=${to}&from=${from}`);
+    const pathNodes = data.path_nodes || [];
+    const dist = data.total_distance_m;
+
+    if (!pathNodes.length) {
+      setHtml('nav-result', errHtml('No path found between these locations.'));
+      return;
+    }
+
+    const nodeLabels = pathNodes.map(n => `<span class="path-node">${LOCATIONS[n] || 'Node ' + n}</span>`);
+    const arrows = nodeLabels.map((n, i) => i < nodeLabels.length - 1 ? n + '<span class="path-arrow">→</span>' : n).join('');
+
+    setHtml('nav-result', `
+      <div class="path-container">
+        <strong>📏 Total distance: ${dist.toFixed(0)} metres</strong>
+        <div class="path-nodes" style="margin-top:10px">${arrows}</div>
+      </div>`);
+
+    document.getElementById('nav-map-wrap').style.display = 'block';
+    drawCampusMap(pathNodes, parseInt(from), parseInt(to));
+  } catch (e) {
+    setHtml('nav-result', errHtml(e.message));
+  }
+}
+
+function drawCampusMap(pathNodes, fromNode, toNode) {
+  const canvas = document.getElementById('nav-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  canvas.width = W;
+  canvas.height = H;
+
+  // Background
+  ctx.fillStyle = '#EFF3FF';
+  ctx.fillRect(0, 0, W, H);
+
+  function px(n) {
+    const p = NODE_POS[n];
+    return p ? { x: p.x * W, y: p.y * H } : null;
+  }
+
+  // Draw edges
+  ctx.strokeStyle = '#BDBDBD';
+  ctx.lineWidth = 2;
+  EDGES.forEach(([a, b]) => {
+    const pa = px(a), pb = px(b);
+    if (!pa || !pb) return;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  });
+
+  // Highlight path edges
+  if (pathNodes.length > 1) {
+    ctx.strokeStyle = '#1565C0';
+    ctx.lineWidth = 4;
+    for (let i = 0; i < pathNodes.length - 1; i++) {
+      const pa = px(pathNodes[i]), pb = px(pathNodes[i + 1]);
+      if (!pa || !pb) continue;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+    }
+  }
+
+  // Draw nodes
+  Object.entries(NODE_POS).forEach(([id, pos]) => {
+    const nId = parseInt(id);
+    const { x, y } = { x: pos.x * W, y: pos.y * H };
+    const inPath = pathNodes.includes(nId);
+    const isFrom = nId === fromNode;
+    const isTo = nId === toNode;
+
+    ctx.beginPath();
+    ctx.arc(x, y, inPath ? 11 : 8, 0, Math.PI * 2);
+    ctx.fillStyle = isFrom ? '#1B5E20' : isTo ? '#B71C1C' : inPath ? '#1565C0' : '#9E9E9E';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = '#212121';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    const label = LOCATIONS[nId] ? LOCATIONS[nId].replace('Computer ', 'Lab').replace(' Block', '').replace(' Corridor', '') : `#${nId}`;
+    ctx.fillText(label, x, y + 22);
+  });
+
+  // Legend
+  ctx.fillStyle = '#1B5E20'; ctx.beginPath(); ctx.arc(12, H - 40, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#212121'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Start', 24, H - 36);
+
+  ctx.fillStyle = '#B71C1C'; ctx.beginPath(); ctx.arc(12, H - 22, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillText('End', 24, H - 18);
+}
+
+/* ══════════════════════════════════════════
+   LOST & FOUND
+══════════════════════════════════════════ */
+let _lfLoaded = false;
+let _lfFilter = null;
+
+function lfCard(item) {
+  const badgeClass = item.status === 'Lost' ? 'badge-red' : item.status === 'Found' ? 'badge-green' : 'badge-grey';
+  const when = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
+  return `
+  <div class="lf-card ${item.status}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="item-name">${item.item_name}</div>
+      <span class="badge ${badgeClass}">${item.status}</span>
+    </div>
+    ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+    <div class="item-meta">📅 ${when} &nbsp;·&nbsp; 🆔 Item #${item.item_id ?? '?'}</div>
+  </div>`;
+}
+
+async function loadLF(status) {
+  _lfLoaded = true;
+  _lfFilter = status || null;
+  const url = '/api/v1/items' + (status ? `?status=${status}` : '');
+  setHtml('lf-container', spinner());
+  try {
+    const data = await apiFetch(url);
+    const items = data.items;
+    setHtml('lf-container', items.length
+      ? items.map(lfCard).join('')
+      : '<div class="empty"><div class="icon">🎉</div>No items found for this filter</div>');
+  } catch (e) {
+    setHtml('lf-container', errHtml(e.message));
+  }
+}
+
+function filterLF(status, chip) {
+  document.querySelectorAll('.chips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  loadLF(status);
+}
+
+async function reportItem() {
+  const name = document.getElementById('lf-name').value.trim();
+  const status = document.getElementById('lf-status').value;
+  const desc = document.getElementById('lf-desc').value.trim();
+
+  if (!name) { toast('Please enter an item name'); return; }
+
+  try {
+    await apiPost('/api/v1/items/report', {
+      user_id: 1,
+      item_name: name,
+      status,
+      description: desc || undefined,
+    });
+    toast('✅ Item reported successfully!');
+    document.getElementById('lf-name').value = '';
+    document.getElementById('lf-desc').value = '';
+    loadLF(_lfFilter);
+  } catch (e) {
+    toast('❌ Error: ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════
+   FACULTY
+══════════════════════════════════════════ */
+let _searchTimer = null;
+
+function facultyCard(f) {
+  const initials = f.name.split(' ').map(w => w[0]).slice(0, 2).join('');
+  const availBadge = f.is_available
+    ? '<span class="badge badge-green">Available</span>'
+    : '<span class="badge badge-grey">Unavailable</span>';
+  const office = f.office
+    ? `🏢 ${f.office.name} · ${f.office.wing_name || ''} · Floor ${f.office.floor_level ?? '?'}`
+    : '🏢 Office not listed';
+
+  const navBtn = f.office
+    ? `<button class="btn btn-outline btn-sm"
+        onclick="navigateToRoom(${f.office.location_id}, '${f.office.name.replace(/'/g,"\\'")}')">
+        🗺️ Navigate to Office</button>`
+    : '';
+
+  return `
+  <div class="faculty-card">
+    <div class="avatar">${initials}</div>
+    <div class="faculty-info" style="flex:1">
+      <div class="name">${f.name} ${availBadge}</div>
+      <div class="designation">${f.designation || ''} · ${f.department || ''}</div>
+      <div style="font-size:0.78rem;color:var(--muted)">${office}</div>
+      <div class="faculty-actions">${navBtn}</div>
+    </div>
+  </div>`;
+}
+
+function searchFaculty(query) {
+  clearTimeout(_searchTimer);
+  if (!query.trim()) {
+    setHtml('faculty-container', '<div class="empty"><div class="icon">👩‍🏫</div>Type a name to search</div>');
+    return;
+  }
+  _searchTimer = setTimeout(async () => {
+    setHtml('faculty-container', spinner());
+    try {
+      const data = await apiFetch(`/api/v1/faculty/search?name=${encodeURIComponent(query.trim())}`);
+      const faculty = data.faculty;
+      setHtml('faculty-container', faculty.length
+        ? faculty.map(facultyCard).join('')
+        : '<div class="empty"><div class="icon">🔍</div>No faculty found for that name</div>');
+    } catch (e) {
+      setHtml('faculty-container', errHtml(e.message));
+    }
+  }, 300);
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+checkHealth();
+loadDashboard();
+</script>
+</body>
+</html>

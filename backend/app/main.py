@@ -15,6 +15,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
 from app.routers import navigation, resources, lost_found, faculty
@@ -58,6 +60,18 @@ app.include_router(faculty.router)
 def health_check():
     """Quick liveness probe used by load-balancers / CI pipelines."""
     return {"status": "ok", "service": "SCNRO Backend"}
+
+
+# Serve the web UI -------------------------------------------------------
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def serve_ui():
+        """Serve the single-page web app at the root URL."""
+        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
 
 
 if __name__ == "__main__":
