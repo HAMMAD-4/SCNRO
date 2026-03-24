@@ -58,3 +58,9 @@ app.include_router(faculty.router)
 def health_check():
     """Quick liveness probe used by load-balancers / CI pipelines."""
     return {"status": "ok", "service": "SCNRO Backend"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

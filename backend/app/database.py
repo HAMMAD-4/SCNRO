@@ -7,10 +7,18 @@ from app.models import Base
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://scnro_user:scnro_pass@localhost:5432/scnro_db",
+    "sqlite:///./scnro_dev.db",
 )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+_sqlite = DATABASE_URL.startswith("sqlite")
+
+if _sqlite:
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
