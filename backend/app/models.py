@@ -236,3 +236,45 @@ class MarkChangeRequest(Base):
     course = relationship("Course")
     record = relationship("MarkRecord")
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class CourseRequest(Base):
+    """Request by head_clerk to register a new course (needs admin approval)."""
+
+    __tablename__ = "course_requests"
+
+    request_id = Column(Integer, primary_key=True, autoincrement=True)
+    clerk_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    code = Column(String(20), nullable=False)
+    name = Column(String(255), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    section = Column(String(20))
+    semester = Column(String(30))
+    # pending | approved | rejected
+    status = Column(String(20), default="pending")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    reviewed_by = Column(Integer, ForeignKey("users.user_id"))
+    reviewed_at = Column(TIMESTAMP)
+
+    clerk = relationship("User", foreign_keys=[clerk_id])
+    teacher = relationship("User", foreign_keys=[teacher_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class EnrollmentRequest(Base):
+    """Request by a student to enroll in a course (needs admin approval)."""
+
+    __tablename__ = "enrollment_requests"
+
+    request_id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
+    # pending | approved | rejected
+    status = Column(String(20), default="pending")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    reviewed_by = Column(Integer, ForeignKey("users.user_id"))
+    reviewed_at = Column(TIMESTAMP)
+
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course")
+    reviewer = relationship("User", foreign_keys=[reviewed_by])

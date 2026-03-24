@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth_utils import hash_password, require_role
 from app.database import get_db
-from app.models import Faculty, ItemLostFound, Location, SignupRequest, User
+from app.models import Faculty, ItemLostFound, Location, SignupRequest, User, Course, Enrollment
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 _admin = Depends(require_role("admin"))
@@ -416,3 +416,205 @@ def reject_mark_change_request(
     req.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Request rejected.", "request_id": request_id}
+
+
+# ── Course Requests (head_clerk submits, admin approves) ──────────────────────
+
+@router.get("/course-requests")
+def list_course_requests(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """List all course registration requests."""
+    from app.models import CourseRequest
+
+    q = db.query(CourseRequest)
+    if status:
+        q = q.filter(CourseRequest.status == status)
+    reqs = q.order_by(CourseRequest.created_at.desc()).all()
+    result = []
+    for r in reqs:
+        clerk   = db.query(User).filter(User.user_id == r.clerk_id).first()
+        teacher = db.query(User).filter(User.user_id == r.teacher_id).first()
+        result.append({
+            "request_id":  r.request_id,
+            "code":        r.code,
+            "name":        r.name,
+            "section":     r.section,
+            "semester":    r.semester,
+            "teacher_name": teacher.name if teacher else "?",
+            "teacher_id":  r.teacher_id,
+            "clerk_name":  clerk.name if clerk else "?",
+            "status":      r.status,
+            "created_at":  str(r.created_at),
+        })
+    return {"requests": result}
+
+
+@router.post("/course-requests/{request_id}/approve")
+def approve_course_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = _admin,
+):
+    """Approve a pending course request — creates the course."""
+    from datetime import datetime, timezone
+
+    from app.models import CourseRequest
+
+    req = db.query(CourseRequest).filter(
+        CourseRequest.request_id == request_id,
+        CourseRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+
+    course = Course(
+        code=req.code,
+        name=req.name,
+        teacher_id=req.teacher_id,
+        section=req.section,
+        semester=req.semester,
+        is_active=True,
+    )
+    db.add(course)
+    req.status = "approved"
+    req.reviewed_by = current_user.user_id if not isinstance(current_user, type) else None
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(course)
+    return {"message": "Course created.", "course_id": course.course_id}
+
+
+@router.post("/course-requests/{request_id}/reject")
+def reject_course_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """Reject a pending course request."""
+    from datetime import datetime, timezone
+
+    from app.models import CourseRequest
+
+    req = db.query(CourseRequest).filter(
+        CourseRequest.request_id == request_id,
+        CourseRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+    req.status = "rejected"
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Rejected.", "request_id": request_id}
+
+
+# ── Enrollment Requests (student submits, admin approves) ─────────────────────
+
+@router.get("/enrollment-requests")
+def list_enrollment_requests(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """List all student enrollment requests."""
+    from app.models import EnrollmentRequest
+
+    q = db.query(EnrollmentRequest)
+    if status:
+        q = q.filter(EnrollmentRequest.status == status)
+    reqs = q.order_by(EnrollmentRequest.created_at.desc()).all()
+    result = []
+    for r in reqs:
+        student = db.query(User).filter(User.user_id == r.student_id).first()
+        course  = db.query(Course).filter(Course.course_id == r.course_id).first()
+        teacher = db.query(User).filter(User.user_id == course.teacher_id).first() if course else None
+        result.append({
+            "request_id":   r.request_id,
+            "student_name": student.name if student else "?",
+            "student_email": student.email if student else "?",
+            "course_code":  course.code if course else "?",
+            "course_name":  course.name if course else "?",
+            "teacher_name": teacher.name if teacher else "?",
+            "status":       r.status,
+            "created_at":   str(r.created_at),
+        })
+    return {"requests": result}
+
+
+@router.post("/enrollment-requests/{request_id}/approve")
+def approve_enrollment_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = _admin,
+):
+    """Approve a student enrollment request — creates the Enrollment."""
+    from datetime import datetime, timezone
+
+    from app.models import EnrollmentRequest
+
+    req = db.query(EnrollmentRequest).filter(
+        EnrollmentRequest.request_id == request_id,
+        EnrollmentRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+
+    # Check not already enrolled
+    existing = db.query(Enrollment).filter(
+        Enrollment.student_id == req.student_id,
+        Enrollment.course_id  == req.course_id,
+    ).first()
+    if existing:
+        req.status = "approved"
+        db.commit()
+        return {"message": "Already enrolled (marked approved).", "enrollment_id": existing.enrollment_id}
+
+    enroll = Enrollment(student_id=req.student_id, course_id=req.course_id)
+    db.add(enroll)
+    req.status = "approved"
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(enroll)
+    return {"message": "Enrollment created.", "enrollment_id": enroll.enrollment_id}
+
+
+@router.post("/enrollment-requests/{request_id}/reject")
+def reject_enrollment_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """Reject a student enrollment request."""
+    from datetime import datetime, timezone
+
+    from app.models import EnrollmentRequest
+
+    req = db.query(EnrollmentRequest).filter(
+        EnrollmentRequest.request_id == request_id,
+        EnrollmentRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+    req.status = "rejected"
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Rejected.", "request_id": request_id}
+
+
+# ── Reactivate user ──────────────────────────────────────────────────────────
+
+@router.post("/staff/{user_id}/reactivate")
+def reactivate_staff(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """Re-activate a previously deactivated user account."""
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user.is_active = True
+    db.commit()
+    return {"message": "User reactivated.", "user_id": user_id}

@@ -16,17 +16,8 @@ from app.database import get_db
 from app.models import User
 
 # ── Config ─────────────────────────────────────────────────────────────────
-_JWT_SECRET_ENV = os.getenv("JWT_SECRET")
-if _JWT_SECRET_ENV:
-    SECRET_KEY = _JWT_SECRET_ENV
-else:
-    import warnings
-    SECRET_KEY = "scnro-super-secret-change-in-prod-2024"
-    warnings.warn(
-        "JWT_SECRET env variable is not set. Using a default key — "
-        "set JWT_SECRET before deploying to production!",
-        stacklevel=2,
-    )
+# Use a stable default key for development; override with JWT_SECRET in production.
+SECRET_KEY = os.getenv("JWT_SECRET", "scnro-super-secret-change-in-prod-2024")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 

@@ -636,3 +636,78 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
 
     doc.build(elements)
     return buf.getvalue()
+
+
+# ── Student Enrollment Requests ──────────────────────────────────────────────
+
+class EnrollmentRequestCreate(BaseModel):
+    course_id: int
+
+
+@router.post("/enrollment-requests", status_code=201)
+def create_enrollment_request(
+    payload: EnrollmentRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """Student submits an enrollment request for admin approval."""
+    from app.models import EnrollmentRequest
+
+    course = db.query(Course).filter(
+        Course.course_id == payload.course_id,
+        Course.is_active.is_(True),
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found.")
+
+    # Already enrolled?
+    if db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.user_id,
+        Enrollment.course_id  == payload.course_id,
+    ).first():
+        raise HTTPException(status_code=409, detail="Already enrolled in this course.")
+
+    # Pending request already?
+    if db.query(EnrollmentRequest).filter(
+        EnrollmentRequest.student_id == current_user.user_id,
+        EnrollmentRequest.course_id  == payload.course_id,
+        EnrollmentRequest.status     == "pending",
+    ).first():
+        raise HTTPException(status_code=409, detail="Enrollment request already pending.")
+
+    req = EnrollmentRequest(
+        student_id=current_user.user_id,
+        course_id=payload.course_id,
+        status="pending",
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return {"message": "Enrollment request submitted.", "request_id": req.request_id}
+
+
+@router.get("/enrollment-requests/my")
+def list_my_enrollment_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """List the current student's enrollment requests."""
+    from app.models import EnrollmentRequest
+
+    reqs = db.query(EnrollmentRequest).filter(
+        EnrollmentRequest.student_id == current_user.user_id
+    ).order_by(EnrollmentRequest.created_at.desc()).all()
+
+    result = []
+    for r in reqs:
+        course  = db.query(Course).filter(Course.course_id == r.course_id).first()
+        teacher = db.query(User).filter(User.user_id == course.teacher_id).first() if course else None
+        result.append({
+            "request_id":   r.request_id,
+            "course_code":  course.code if course else "?",
+            "course_name":  course.name if course else "?",
+            "teacher_name": teacher.name if teacher else "?",
+            "status":       r.status,
+            "created_at":   str(r.created_at),
+        })
+    return {"requests": result}

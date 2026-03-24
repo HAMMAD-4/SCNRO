@@ -283,3 +283,72 @@ def delete_location(
     db.delete(loc)
     db.commit()
     return {"message": "Location deleted.", "location_id": location_id}
+
+
+# ── Course Requests ───────────────────────────────────────────────────────────
+
+class CourseRequestCreate(BaseModel):
+    code: str
+    name: str
+    teacher_id: int
+    section: Optional[str] = None
+    semester: Optional[str] = None
+
+
+@router.post("/course-requests", status_code=201)
+def submit_course_request(
+    payload: CourseRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = _clerk_or_admin,
+):
+    """Head clerk submits a course registration request for admin approval."""
+    from app.models import CourseRequest
+
+    teacher = db.query(User).filter(
+        User.user_id == payload.teacher_id,
+        User.role == "teacher",
+    ).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+
+    req = CourseRequest(
+        clerk_id=current_user.user_id,
+        code=payload.code,
+        name=payload.name,
+        teacher_id=payload.teacher_id,
+        section=payload.section,
+        semester=payload.semester,
+        status="pending",
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return {"message": "Course request submitted.", "request_id": req.request_id}
+
+
+@router.get("/course-requests")
+def list_my_course_requests(
+    db: Session = Depends(get_db),
+    current_user: User = _clerk_or_admin,
+):
+    """List course requests submitted by this clerk (or all if admin)."""
+    from app.models import CourseRequest
+
+    q = db.query(CourseRequest)
+    if current_user.role != "admin":
+        q = q.filter(CourseRequest.clerk_id == current_user.user_id)
+    reqs = q.order_by(CourseRequest.created_at.desc()).all()
+    result = []
+    for r in reqs:
+        teacher = db.query(User).filter(User.user_id == r.teacher_id).first()
+        result.append({
+            "request_id": r.request_id,
+            "code": r.code,
+            "name": r.name,
+            "section": r.section,
+            "semester": r.semester,
+            "teacher_name": teacher.name if teacher else "?",
+            "status": r.status,
+            "created_at": str(r.created_at),
+        })
+    return {"requests": result}
