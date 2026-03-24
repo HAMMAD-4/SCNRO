@@ -4,7 +4,9 @@ from datetime import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models import Base, Faculty, Location, Schedule
+from app.models import (
+    Base, Course, Enrollment, Faculty, Location, MarkRecord, Schedule, User,
+)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -25,10 +27,9 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def _seed(db) -> None:
-    """Insert sample PUCIT data if the database is empty."""
+def _seed_locations(db) -> None:
     if db.query(Location).first() is not None:
-        return  # already seeded
+        return
 
     locations = [
         Location(location_id=1,  name="Main Entrance",     category="Corridor",  wing_name="Old Campus", floor_level=0, latitude=31.48260, longitude=74.30360),
@@ -70,12 +71,92 @@ def _seed(db) -> None:
     db.commit()
 
 
+def _seed_users(db) -> None:
+    """Seed demo users for each role if none exist yet."""
+    from app.auth_utils import hash_password
+
+    if db.query(User).first() is not None:
+        return
+
+    users = [
+        User(email="admin@pucit.edu.pk",   name="Admin",         password_hash=hash_password("Admin@123"),   role="admin"),
+        User(email="teacher@pucit.edu.pk", name="Dr. Ahmed Khan",password_hash=hash_password("Teacher@123"), role="teacher"),
+        User(email="teacher2@pucit.edu.pk",name="Dr. Sara Iqbal", password_hash=hash_password("Teacher@123"), role="teacher"),
+        User(email="student1@pucit.edu.pk",name="Ali Raza",       password_hash=hash_password("Student@123"), role="student"),
+        User(email="student2@pucit.edu.pk",name="Zara Ahmed",     password_hash=hash_password("Student@123"), role="student"),
+        User(email="student3@pucit.edu.pk",name="Omar Sheikh",    password_hash=hash_password("Student@123"), role="student"),
+        User(email="sac@pucit.edu.pk",     name="SAC Officer",    password_hash=hash_password("Sac@123"),     role="sac"),
+        User(email="clerk@pucit.edu.pk",   name="Head Clerk",     password_hash=hash_password("Clerk@123"),   role="head_clerk"),
+    ]
+    db.add_all(users)
+    db.commit()
+    for u in users:
+        db.refresh(u)
+
+    # Map by email for convenience
+    by_email = {u.email: u for u in users}
+    teacher1 = by_email["teacher@pucit.edu.pk"]
+    teacher2 = by_email["teacher2@pucit.edu.pk"]
+    s1 = by_email["student1@pucit.edu.pk"]
+    s2 = by_email["student2@pucit.edu.pk"]
+    s3 = by_email["student3@pucit.edu.pk"]
+
+    # Courses
+    c1 = Course(code="CS-301", name="Data Structures", teacher_id=teacher1.user_id,
+                section="A", semester="Fall 2024")
+    c2 = Course(code="SE-201", name="Software Engineering", teacher_id=teacher2.user_id,
+                section="B", semester="Fall 2024")
+    db.add_all([c1, c2])
+    db.commit()
+    db.refresh(c1)
+    db.refresh(c2)
+
+    # Enrollments
+    enrollments = [
+        Enrollment(student_id=s1.user_id, course_id=c1.course_id),
+        Enrollment(student_id=s2.user_id, course_id=c1.course_id),
+        Enrollment(student_id=s3.user_id, course_id=c1.course_id),
+        Enrollment(student_id=s1.user_id, course_id=c2.course_id),
+        Enrollment(student_id=s2.user_id, course_id=c2.course_id),
+    ]
+    db.add_all(enrollments)
+    db.commit()
+
+    # Sample marks for CS-301
+    marks = [
+        # Attendance
+        MarkRecord(student_id=s1.user_id, course_id=c1.course_id, category="attendance",
+                   title="Attendance", marks_obtained=42, total_marks=45, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s2.user_id, course_id=c1.course_id, category="attendance",
+                   title="Attendance", marks_obtained=38, total_marks=45, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s3.user_id, course_id=c1.course_id, category="attendance",
+                   title="Attendance", marks_obtained=40, total_marks=45, uploaded_by=teacher1.user_id),
+        # Quizzes
+        MarkRecord(student_id=s1.user_id, course_id=c1.course_id, category="quiz",
+                   title="Quiz 1", marks_obtained=8, total_marks=10, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s2.user_id, course_id=c1.course_id, category="quiz",
+                   title="Quiz 1", marks_obtained=7, total_marks=10, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s3.user_id, course_id=c1.course_id, category="quiz",
+                   title="Quiz 1", marks_obtained=9, total_marks=10, uploaded_by=teacher1.user_id),
+        # Mid
+        MarkRecord(student_id=s1.user_id, course_id=c1.course_id, category="mid",
+                   title="Mid Exam", marks_obtained=24, total_marks=30, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s2.user_id, course_id=c1.course_id, category="mid",
+                   title="Mid Exam", marks_obtained=21, total_marks=30, uploaded_by=teacher1.user_id),
+        MarkRecord(student_id=s3.user_id, course_id=c1.course_id, category="mid",
+                   title="Mid Exam", marks_obtained=26, total_marks=30, uploaded_by=teacher1.user_id),
+    ]
+    db.add_all(marks)
+    db.commit()
+
+
 def init_db() -> None:
     """Create all tables and seed with sample data."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        _seed(db)
+        _seed_locations(db)
+        _seed_users(db)
     finally:
         db.close()
 

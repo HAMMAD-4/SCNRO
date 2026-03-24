@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.auth_utils import require_role
 from app.database import get_db
-from app.models import ItemLostFound
+from app.models import ItemLostFound, User
 
 router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
 
@@ -97,6 +98,25 @@ def claim_item(item_id: int, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")
     item.status = "Claimed"
+    db.commit()
+    db.refresh(item)
+    return {"item_id": item.item_id, "status": item.status}
+
+
+@router.patch("/items/{item_id}/close")
+def close_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "sac")),
+):
+    """Mark a lost & found report as Closed (SAC office or admin only)."""
+    item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if item.status == "Closed":
+        raise HTTPException(status_code=400, detail="Item already closed.")
+    item.status = "Closed"
+    item.closed_by = current_user.user_id
     db.commit()
     db.refresh(item)
     return {"item_id": item.item_id, "status": item.status}

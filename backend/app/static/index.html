@@ -1,933 +1,1240 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SCNRO – Smart Campus Navigation & Resource Optimizer</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SCNRO – Smart Campus Portal</title>
 <style>
-  :root {
-    --primary: #1565C0;
-    --primary-dark: #0D47A1;
-    --primary-light: #E3F2FD;
-    --accent: #FF6F00;
-    --green: #2E7D32;
-    --red: #C62828;
-    --amber: #F57F17;
-    --bg: #F5F7FA;
-    --card: #FFFFFF;
-    --border: #E0E0E0;
-    --text: #212121;
-    --muted: #757575;
-    --radius: 12px;
-    --shadow: 0 2px 8px rgba(0,0,0,0.10);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
-  /* ── App Shell ── */
-  #app { display: flex; flex-direction: column; min-height: 100vh; }
-
-  header {
-    background: var(--primary);
-    color: white;
-    padding: 0 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  }
-  header .brand { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
-  header .brand span { opacity: 0.7; font-weight: 400; font-size: 0.85rem; margin-left: 8px; }
-  #health-dot { width: 10px; height: 10px; border-radius: 50%; background: #aaa; display: inline-block; margin-right: 6px; }
-  #health-dot.online { background: #69F0AE; }
-
-  nav {
-    background: var(--primary-dark);
-    display: flex;
-    gap: 2px;
-    padding: 0 16px;
-  }
-  nav button {
-    background: none;
-    border: none;
-    color: rgba(255,255,255,0.7);
-    padding: 12px 18px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.15s;
-    letter-spacing: 0.3px;
-  }
-  nav button:hover { color: white; background: rgba(255,255,255,0.07); }
-  nav button.active { color: white; border-bottom-color: #82B1FF; }
-
-  main { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
-
-  /* ── Cards ── */
-  .card {
-    background: var(--card);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    padding: 20px;
-    margin-bottom: 16px;
-  }
-  .card-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .card-title .icon { font-size: 1.2rem; }
-
-  /* ── Grid ── */
-  .grid { display: grid; gap: 16px; }
-  .grid-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-
-  /* ── Badges ── */
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-  }
-  .badge-green { background: #E8F5E9; color: var(--green); }
-  .badge-red { background: #FFEBEE; color: var(--red); }
-  .badge-amber { background: #FFF8E1; color: var(--amber); }
-  .badge-blue { background: var(--primary-light); color: var(--primary); }
-  .badge-grey { background: #F5F5F5; color: var(--muted); }
-
-  /* ── Inputs ── */
-  .input-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-  input, select, textarea {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-    background: white;
-  }
-  input:focus, select:focus, textarea:focus { border-color: var(--primary); }
-  input.grow, select.grow { flex: 1; min-width: 120px; }
-  textarea { width: 100%; resize: vertical; min-height: 70px; }
-
-  /* ── Buttons ── */
-  .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
-    border: none;
-    font-size: 0.88rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .btn:active { transform: scale(0.97); }
-  .btn-primary { background: var(--primary); color: white; }
-  .btn-primary:hover { background: var(--primary-dark); }
-  .btn-outline { background: white; color: var(--primary); border: 1px solid var(--primary); }
-  .btn-outline:hover { background: var(--primary-light); }
-  .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
-  .btn-danger { background: var(--red); color: white; }
-  .btn-success { background: var(--green); color: white; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── Loading / Empty ── */
-  .spinner {
-    display: flex; justify-content: center; align-items: center;
-    padding: 40px;
-  }
-  .spinner::after {
-    content: '';
-    width: 36px; height: 36px;
-    border: 4px solid var(--border);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .empty { text-align: center; padding: 40px; color: var(--muted); }
-  .empty .icon { font-size: 2.5rem; margin-bottom: 10px; }
-  .error-msg { background: #FFEBEE; color: var(--red); border: 1px solid #FFCDD2; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 0.88rem; }
-
-  /* ── Room card ── */
-  .room-card {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    position: relative;
-    transition: box-shadow 0.15s;
-  }
-  .room-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-  .room-card .room-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
-  .room-card .room-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
-  .room-card .free-bar {
-    height: 4px;
-    background: #E0E0E0;
-    border-radius: 2px;
-    margin-bottom: 10px;
-    overflow: hidden;
-  }
-  .room-card .free-bar-fill { height: 100%; background: var(--green); border-radius: 2px; }
-  .room-score { position: absolute; top: 14px; right: 14px; font-size: 0.75rem; color: var(--muted); }
-
-  /* ── Faculty card ── */
-  .faculty-card {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    transition: box-shadow 0.15s;
-  }
-  .faculty-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-  .avatar {
-    width: 48px; height: 48px;
-    border-radius: 50%;
-    background: var(--primary-light);
-    color: var(--primary);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.2rem;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-  .faculty-info .name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
-  .faculty-info .designation { font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
-  .faculty-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
-
-  /* ── Lost Found card ── */
-  .lf-card {
-    background: white;
-    border: 1px solid var(--border);
-    border-left: 4px solid transparent;
-    border-radius: var(--radius);
-    padding: 16px;
-    transition: box-shadow 0.15s;
-  }
-  .lf-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
-  .lf-card.Lost { border-left-color: var(--red); }
-  .lf-card.Found { border-left-color: var(--green); }
-  .lf-card.Claimed { border-left-color: var(--muted); opacity: 0.7; }
-  .lf-card .item-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
-  .lf-card .item-desc { font-size: 0.83rem; color: var(--muted); margin-bottom: 10px; }
-  .lf-card .item-meta { font-size: 0.75rem; color: var(--muted); }
-
-  /* ── Navigation UI ── */
-  .path-container {
-    background: var(--primary-light);
-    border: 1px solid #90CAF9;
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-top: 12px;
-  }
-  .path-nodes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
-    align-items: center;
-    margin-top: 8px;
-  }
-  .path-node {
-    background: var(--primary);
-    color: white;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-  }
-  .path-arrow { color: var(--primary); font-size: 1.1rem; margin: 0 4px; }
-
-  /* ── Map placeholder (canvas-based) ── */
-  #nav-canvas {
-    width: 100%;
-    height: 280px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: #EFF3FF;
-    display: block;
-    cursor: crosshair;
-  }
-
-  /* ── Dashboard summary row ── */
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .stat-card {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    text-align: center;
-  }
-  .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--primary); line-height: 1; }
-  .stat-card .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
-
-  /* ── Form ── */
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
-  .form-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-  .form-field input, .form-field select, .form-field textarea { width: 100%; }
-
-  /* ── Tabs hidden ── */
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-
-  /* ── Toast ── */
-  #toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: #323232; color: white; padding: 12px 24px; border-radius: 24px;
-    font-size: 0.88rem; z-index: 1000; transition: transform 0.25s; pointer-events: none;
-  }
-  #toast.show { transform: translateX(-50%) translateY(0); }
-
-  /* ── Filter chips ── */
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .chip {
-    padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 500;
-    border: 1px solid var(--border); background: white; cursor: pointer; transition: all 0.12s;
-  }
-  .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
-  .chip:hover:not(.active) { background: var(--primary-light); border-color: #90CAF9; }
-
-  /* ── Section title ── */
-  .section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .section-title small { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
-
-  @media (max-width: 600px) {
-    main { padding: 12px; }
-    nav button { padding: 10px 10px; font-size: 0.78rem; }
-    header .brand span { display: none; }
-  }
+:root{
+  --primary:#1565C0;--primary-dark:#0D47A1;--primary-light:#E3F2FD;
+  --green:#2E7D32;--red:#C62828;--amber:#E65100;--purple:#6A1B9A;
+  --bg:#F5F7FA;--card:#FFF;--border:#E0E0E0;--text:#212121;--muted:#757575;
+  --radius:12px;--shadow:0 2px 8px rgba(0,0,0,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+/* ── Auth screens ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0D47A1 0%,#1565C0 60%,#1976D2 100%);}
+.auth-box{background:#fff;border-radius:16px;padding:36px 40px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.2);}
+.auth-box h1{font-size:1.4rem;font-weight:700;color:var(--primary);margin-bottom:4px;}
+.auth-box .sub{font-size:.85rem;color:var(--muted);margin-bottom:24px;}
+.auth-box label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:4px;margin-top:14px;}
+.auth-box input,.auth-box select{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;outline:none;font-family:inherit;}
+.auth-box input:focus,.auth-box select:focus{border-color:var(--primary);}
+.auth-box .btn-auth{width:100%;margin-top:20px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;}
+.auth-box .btn-auth:hover{background:var(--primary-dark);}
+.auth-switch{text-align:center;margin-top:16px;font-size:.85rem;color:var(--muted);}
+.auth-switch a{color:var(--primary);cursor:pointer;font-weight:600;text-decoration:none;}
+.auth-err{background:#FFEBEE;color:var(--red);border-radius:8px;padding:10px 14px;font-size:.83rem;margin-top:12px;}
+/* ── App shell ── */
+#app{display:flex;flex-direction:column;min-height:100vh;}
+header{background:var(--primary);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+.brand{font-size:1.05rem;font-weight:700;}
+.brand span{opacity:.7;font-weight:400;font-size:.8rem;margin-left:8px;}
+.user-info{display:flex;align-items:center;gap:12px;font-size:.82rem;}
+.role-badge{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.role-admin{background:#FF6F00;color:#fff;}
+.role-teacher{background:#2E7D32;color:#fff;}
+.role-student{background:#6A1B9A;color:#fff;}
+.role-sac{background:#C62828;color:#fff;}
+.role-head_clerk{background:#00695C;color:#fff;}
+.btn-logout{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:5px 14px;border-radius:8px;font-size:.8rem;cursor:pointer;}
+.btn-logout:hover{background:rgba(255,255,255,.25);}
+nav{background:var(--primary-dark);display:flex;gap:2px;padding:0 12px;overflow-x:auto;}
+nav button{background:none;border:none;color:rgba(255,255,255,.7);padding:11px 14px;font-size:.82rem;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;}
+nav button:hover{color:#fff;background:rgba(255,255,255,.07);}
+nav button.active{color:#fff;border-bottom-color:#82B1FF;}
+main{flex:1;padding:20px;max-width:1200px;margin:0 auto;width:100%;}
+/* ── Cards / Grid ── */
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);padding:20px;margin-bottom:16px;}
+.card-title{font-size:1rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;}
+.stat-card .val{font-size:2rem;font-weight:700;color:var(--primary);}
+.stat-card .lbl{font-size:.75rem;color:var(--muted);margin-top:4px;}
+/* ── Buttons ── */
+.btn{padding:9px 18px;border-radius:8px;border:none;font-size:.85rem;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;display:inline-flex;align-items:center;gap:6px;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-outline{background:#fff;color:var(--primary);border:1px solid var(--primary);}
+.btn-outline:hover{background:var(--primary-light);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#B71C1C;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-success:hover{background:#1B5E20;}
+.btn-amber{background:var(--amber);color:#fff;}
+.btn-sm{padding:5px 12px;font-size:.78rem;}
+/* ── Inputs ── */
+.input-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+input,select,textarea{border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-size:.88rem;font-family:inherit;outline:none;background:#fff;}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);}
+input.grow,select.grow{flex:1;min-width:120px;}
+textarea{width:100%;resize:vertical;min-height:70px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-field label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:4px;}
+.form-field input,.form-field select,.form-field textarea{width:100%;}
+@media(max-width:540px){.form-grid{grid-template-columns:1fr;}}
+/* ── Tables ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:.85rem;}
+thead{background:var(--primary);}
+thead th{color:#fff;padding:10px 14px;text-align:left;font-weight:600;font-size:.8rem;}
+tbody tr:nth-child(even){background:#F8F9FE;}
+tbody tr:hover{background:var(--primary-light);}
+tbody td{padding:9px 14px;vertical-align:middle;border-bottom:1px solid var(--border);}
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.3px;}
+.badge-green{background:#E8F5E9;color:var(--green);}
+.badge-red{background:#FFEBEE;color:var(--red);}
+.badge-amber{background:#FFF3E0;color:var(--amber);}
+.badge-blue{background:var(--primary-light);color:var(--primary);}
+.badge-grey{background:#F5F5F5;color:var(--muted);}
+.badge-purple{background:#F3E5F5;color:var(--purple);}
+/* ── Loading / empty ── */
+.spinner{display:flex;justify-content:center;padding:40px;}
+.spinner::after{content:'';width:36px;height:36px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty{text-align:center;padding:40px;color:var(--muted);}
+.empty .icon{font-size:2.5rem;margin-bottom:10px;}
+.err-msg{background:#FFEBEE;color:var(--red);border:1px solid #FFCDD2;border-radius:8px;padding:11px 16px;margin-bottom:12px;font-size:.85rem;}
+.ok-msg{background:#E8F5E9;color:var(--green);border:1px solid #C8E6C9;border-radius:8px;padding:11px 16px;margin-bottom:12px;font-size:.85rem;}
+/* ── Tab panels ── */
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+/* ── Section title ── */
+.section-title{font-size:1.05rem;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+.section-title small{font-size:.76rem;color:var(--muted);font-weight:400;}
+/* ── Chips ── */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.chip{padding:4px 14px;border-radius:20px;font-size:.78rem;font-weight:500;border:1px solid var(--border);background:#fff;cursor:pointer;transition:all .12s;}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;}
+.modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);}
+.modal h2{font-size:1.1rem;font-weight:700;margin-bottom:18px;color:var(--primary);}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+/* ── Lost found cards ── */
+.lf-card{background:#fff;border:1px solid var(--border);border-left:4px solid transparent;border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+.lf-card.Lost{border-left-color:var(--red);}
+.lf-card.Found{border-left-color:var(--green);}
+.lf-card.Claimed,.lf-card.Closed{border-left-color:var(--muted);opacity:.7;}
+/* ── Room card ── */
+.room-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;transition:box-shadow .15s;}
+.room-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.12);}
+.room-card .room-name{font-weight:600;font-size:.95rem;margin-bottom:6px;}
+.room-card .room-meta{font-size:.78rem;color:var(--muted);margin-bottom:10px;line-height:1.6;}
+.free-bar{height:4px;background:#E0E0E0;border-radius:2px;margin-bottom:10px;}
+.free-bar-fill{height:100%;background:var(--green);border-radius:2px;}
+/* ── Faculty card ── */
+.faculty-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:flex-start;gap:14px;margin-bottom:10px;}
+.avatar{width:44px;height:44px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0;}
+/* ── Canvas map ── */
+#nav-canvas{width:100%;height:260px;border-radius:var(--radius);border:1px solid var(--border);background:#EFF3FF;display:block;cursor:crosshair;}
+/* ── Path nodes ── */
+.path-node{background:var(--primary);color:#fff;padding:4px 11px;border-radius:20px;font-size:.78rem;font-weight:500;}
+.path-arrow{color:var(--primary);margin:0 4px;}
+/* ── Marks table color-coding ── */
+.lock-badge{background:#FFF3E0;color:#E65100;border:1px solid #FFE0B2;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;}
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#323232;color:#fff;padding:11px 22px;border-radius:24px;font-size:.86rem;z-index:1000;transition:transform .25s;pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+@media(max-width:600px){main{padding:12px;}nav button{padding:10px 10px;font-size:.76rem;}.brand span{display:none;}}
 </style>
 </head>
 <body>
-<div id="app">
 
+<!-- ═══════════════ LOGIN ═══════════════ -->
+<div id="screen-login" class="auth-wrap">
+  <div class="auth-box">
+    <h1>🎓 SCNRO Portal</h1>
+    <p class="sub">Smart Campus Navigation & Resource Optimizer — PUCIT</p>
+    <label for="l-email">University Email</label>
+    <input id="l-email" type="email" placeholder="yourname@pucit.edu.pk" autocomplete="email"/>
+    <label for="l-pass">Password</label>
+    <input id="l-pass" type="password" placeholder="Enter password" autocomplete="current-password"/>
+    <div id="l-err"></div>
+    <button class="btn-auth" onclick="doLogin()">Sign In</button>
+    <p class="auth-switch">New user? <a onclick="showScreen('screen-signup')">Request Access</a></p>
+    <p style="margin-top:14px;font-size:.75rem;color:var(--muted);text-align:center;">
+      Demo — Admin: admin@pucit.edu.pk / Admin@123<br>
+      Teacher: teacher@pucit.edu.pk / Teacher@123<br>
+      Student: student1@pucit.edu.pk / Student@123<br>
+      SAC: sac@pucit.edu.pk / Sac@123 &nbsp;|&nbsp; Clerk: clerk@pucit.edu.pk / Clerk@123
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════ SIGNUP REQUEST ═══════════════ -->
+<div id="screen-signup" class="auth-wrap" style="display:none">
+  <div class="auth-box">
+    <h1>Request Access</h1>
+    <p class="sub">Your request will be reviewed by the admin before activation.</p>
+    <label>Full Name</label>
+    <input id="s-name" placeholder="e.g. Ali Raza"/>
+    <label>University Email</label>
+    <input id="s-email" type="email" placeholder="yourname@pucit.edu.pk"/>
+    <label>Password</label>
+    <input id="s-pass" type="password" placeholder="Minimum 6 characters"/>
+    <label>Role</label>
+    <select id="s-role">
+      <option value="student">Student</option>
+      <option value="teacher">Teacher</option>
+      <option value="sac">SAC Officer</option>
+      <option value="head_clerk">Head Clerk</option>
+    </select>
+    <div id="s-err"></div>
+    <button class="btn-auth" onclick="doSignupRequest()">Submit Request</button>
+    <p class="auth-switch">Already have access? <a onclick="showScreen('screen-login')">Sign In</a></p>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN APP ═══════════════ -->
+<div id="screen-app" style="display:none">
+<div id="app">
   <header>
-    <div class="brand">
-      🎓 SCNRO <span>Smart Campus · PUCIT</span>
-    </div>
-    <div style="display:flex;align-items:center;font-size:0.8rem;color:rgba(255,255,255,0.8)">
-      <span id="health-dot"></span>
-      <span id="health-label">Connecting…</span>
+    <div class="brand">🎓 SCNRO <span>Smart Campus Portal · PUCIT</span></div>
+    <div class="user-info">
+      <span id="hdr-name"></span>
+      <span id="hdr-role" class="role-badge"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
     </div>
   </header>
-
-  <nav id="nav-tabs">
-    <button class="active" onclick="switchTab('dashboard',this)">🏠 Dashboard</button>
-    <button onclick="switchTab('rooms',this)">🚪 Free Rooms</button>
-    <button onclick="switchTab('navigate',this)">🗺️ Navigate</button>
-    <button onclick="switchTab('lostfound',this)">🔍 Lost &amp; Found</button>
-    <button onclick="switchTab('faculty',this)">👩‍🏫 Faculty</button>
-  </nav>
-
-  <main>
-
-    <!-- ═══ DASHBOARD ═══ -->
-    <div id="tab-dashboard" class="tab-panel active">
-      <div class="section-title">
-        Live Campus Overview
-        <small id="dash-time"></small>
-      </div>
-
-      <div class="stat-row" id="stat-row">
-        <div class="stat-card"><div class="val" id="stat-free">–</div><div class="lbl">Free Rooms</div></div>
-        <div class="stat-card"><div class="val" id="stat-lost">–</div><div class="lbl">Lost Items</div></div>
-        <div class="stat-card"><div class="val" id="stat-found">–</div><div class="lbl">Found Items</div></div>
-        <div class="stat-card"><div class="val" id="stat-faculty">–</div><div class="lbl">Faculty Listed</div></div>
-      </div>
-
-      <div class="section-title" style="margin-top:4px">
-        Top Free Rooms Right Now
-        <button class="btn btn-outline btn-sm" onclick="switchTab('rooms', document.querySelector('[onclick*=rooms]'))">See all →</button>
-      </div>
-      <div id="dash-rooms" class="grid grid-3"></div>
-
-      <div class="section-title" style="margin-top:20px">
-        Recent Lost &amp; Found Posts
-        <button class="btn btn-outline btn-sm" onclick="switchTab('lostfound', document.querySelector('[onclick*=lostfound]'))">See all →</button>
-      </div>
-      <div id="dash-lf"></div>
-    </div>
-
-    <!-- ═══ FREE ROOMS ═══ -->
-    <div id="tab-rooms" class="tab-panel">
-      <div class="section-title">Available Rooms &amp; Labs <small>Ranked by proximity &amp; free time</small></div>
-      <div class="card" style="padding:14px">
-        <div class="input-row">
-          <input id="user-lat" class="grow" type="number" step="any" placeholder="Your latitude (default: PUCIT)" value="31.4826" aria-label="Your latitude" />
-          <input id="user-lng" class="grow" type="number" step="any" placeholder="Your longitude" value="74.3036" aria-label="Your longitude" />
-          <button class="btn btn-primary" onclick="loadRooms()">🔄 Refresh</button>
-        </div>
-      </div>
-      <div id="rooms-container"></div>
-    </div>
-
-    <!-- ═══ NAVIGATE ═══ -->
-    <div id="tab-navigate" class="tab-panel">
-      <div class="section-title">Indoor Navigation <small>Shortest path using Dijkstra</small></div>
-      <div class="card">
-        <div class="input-row">
-          <select id="nav-from" class="grow">
-            <option value="1">Main Entrance (default start)</option>
-          </select>
-          <select id="nav-to" class="grow">
-            <option value="">– Select destination –</option>
-          </select>
-          <button class="btn btn-primary" onclick="getPath()">📍 Find Path</button>
-        </div>
-        <div id="nav-result"></div>
-        <div id="nav-map-wrap" style="margin-top:14px;display:none">
-          <canvas id="nav-canvas"></canvas>
-          <p style="font-size:0.75rem;color:var(--muted);margin-top:6px;text-align:center">
-            Campus node map — blue = start, red = end, highlighted nodes = path
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ LOST & FOUND ═══ -->
-    <div id="tab-lostfound" class="tab-panel">
-      <div class="section-title">Community Board <small>Report or find lost items</small></div>
-
-      <!-- Report form -->
-      <div class="card">
-        <div class="card-title"><span class="icon">➕</span> Report an Item</div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label for="lf-name">Item Name *</label>
-            <input id="lf-name" placeholder="e.g. Black Wallet" required aria-required="true" />
-          </div>
-          <div class="form-field">
-            <label>Status *</label>
-            <select id="lf-status">
-              <option value="Lost">Lost</option>
-              <option value="Found">Found</option>
-            </select>
-          </div>
-          <div class="form-field" style="grid-column:1/-1">
-            <label>Description</label>
-            <textarea id="lf-desc" placeholder="Describe the item — colour, brand, contents…"></textarea>
-          </div>
-        </div>
-        <button class="btn btn-primary" style="margin-top:4px" onclick="reportItem()">Submit Report</button>
-      </div>
-
-      <!-- Filter + list -->
-      <div class="chips">
-        <span class="chip active" onclick="filterLF(null,this)">All</span>
-        <span class="chip" onclick="filterLF('Lost',this)">Lost</span>
-        <span class="chip" onclick="filterLF('Found',this)">Found</span>
-        <span class="chip" onclick="filterLF('Claimed',this)">Claimed</span>
-      </div>
-      <div id="lf-container"></div>
-    </div>
-
-    <!-- ═══ FACULTY ═══ -->
-    <div id="tab-faculty" class="tab-panel">
-      <div class="section-title">Faculty Directory <small>Search by name</small></div>
-      <div class="input-row">
-        <input id="faculty-search" class="grow" placeholder="Type a name, e.g. Ahmed…" oninput="searchFaculty(this.value)" />
-        <button class="btn btn-primary" onclick="searchFaculty(document.getElementById('faculty-search').value)">🔍 Search</button>
-      </div>
-      <div id="faculty-container">
-        <div class="empty"><div class="icon">👩‍🏫</div>Type a name above to search faculty</div>
-      </div>
-    </div>
-
-  </main>
+  <nav id="main-nav"></nav>
+  <main id="main-content"></main>
+</div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-/* ══════════════════════════════════════════════════════════
-   SCNRO Web Client
-   Communicates with the FastAPI backend at the same origin.
-══════════════════════════════════════════════════════════ */
-
-const API = ''; // same origin
-
-/* ── App constants ── */
-const DEFAULT_USER_ID = 1;          // placeholder user ID (app has no auth layer)
-const MAX_FREE_MINUTES = 120;       // cap used to calculate the free-time bar width
-const TAB_SWITCH_DELAY_MS = 300;    // ms to wait after tab switch before pre-filling nav form
-
-/* ── Utilities ── */
-function toast(msg, ms = 3000) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), ms);
-}
-
-async function apiFetch(path) {
-  const r = await fetch(API + path);
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-  return r.json();
-}
-
-async function apiPost(path, body) {
-  const r = await fetch(API + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const err = await r.json().catch(() => ({ detail: r.statusText }));
-    throw new Error(err.detail || r.statusText);
-  }
-  return r.json();
-}
-
-function setHtml(id, html) { document.getElementById(id).innerHTML = html; }
-function spinner() { return '<div class="spinner"></div>'; }
-function errHtml(msg) { return `<div class="error-msg">⚠️ ${msg}</div>`; }
-
-/* ── Tab switching ── */
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  if (btn) btn.classList.add('active');
-
-  // Lazy-load on first visit
-  if (name === 'rooms' && !_roomsLoaded) loadRooms();
-  if (name === 'lostfound' && !_lfLoaded) loadLF();
-  if (name === 'navigate' && !_navLoaded) loadNavLocations();
-}
-
 /* ══════════════════════════════════════════
-   HEALTH CHECK
+   SCNRO Unified Portal — Role-Based SPA
 ══════════════════════════════════════════ */
-async function checkHealth() {
-  try {
-    const d = await apiFetch('/health');
-    document.getElementById('health-dot').className = 'online';
-    document.getElementById('health-label').textContent = 'Backend online';
-  } catch {
-    document.getElementById('health-label').textContent = 'Backend offline';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let _token = localStorage.getItem('scnro_token') || null;
+let _user  = JSON.parse(localStorage.getItem('scnro_user') || 'null');
+let _currentTab = '';
+
+const MAX_FREE_MINUTES   = 120;
+const TAB_SWITCH_DELAY   = 300;
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function toast(msg, ms=3000){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),ms);
+}
+function setHtml(id,html){const el=document.getElementById(id);if(el)el.innerHTML=html;}
+function spinner(){return'<div class="spinner"></div>';}
+function errHtml(m){return`<div class="err-msg">⚠️ ${m}</div>`;}
+function okHtml(m){return`<div class="ok-msg">✅ ${m}</div>`;}
+
+async function api(path,opts={}){
+  const headers={'Content-Type':'application/json',...(opts.headers||{})};
+  if(_token) headers['Authorization']='Bearer '+_token;
+  const r=await fetch(path,{...opts,headers});
+  if(!r.ok){
+    let msg=r.statusText;
+    try{const d=await r.json();msg=d.detail||msg;}catch{}
+    throw new Error(msg);
+  }
+  if(r.headers.get('content-type')?.includes('application/pdf')) return r.blob();
+  const ct=r.headers.get('content-type')||'';
+  if(ct.includes('json')) return r.json();
+  return r.text();
+}
+
+function showScreen(id){
+  ['screen-login','screen-signup','screen-app'].forEach(s=>{
+    document.getElementById(s).style.display=s===id?'':'none';
+  });
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+async function doLogin(){
+  const email=document.getElementById('l-email').value.trim();
+  const pass=document.getElementById('l-pass').value;
+  document.getElementById('l-err').innerHTML='';
+  try{
+    const d=await api('/api/v1/auth/login',{method:'POST',body:JSON.stringify({email,password:pass})});
+    _token=d.access_token;
+    _user={user_id:d.user_id,name:d.name,email:d.email,role:d.role};
+    localStorage.setItem('scnro_token',_token);
+    localStorage.setItem('scnro_user',JSON.stringify(_user));
+    initApp();
+  }catch(e){
+    document.getElementById('l-err').innerHTML=`<div class="auth-err">${e.message}</div>`;
+  }
+}
+
+async function doSignupRequest(){
+  const name=document.getElementById('s-name').value.trim();
+  const email=document.getElementById('s-email').value.trim();
+  const pass=document.getElementById('s-pass').value;
+  const role=document.getElementById('s-role').value;
+  document.getElementById('s-err').innerHTML='';
+  try{
+    await api('/api/v1/auth/signup-request',{method:'POST',body:JSON.stringify({name,email,password:pass,role})});
+    document.getElementById('s-err').innerHTML='<div class="ok-msg">✅ Request submitted! Wait for admin approval before logging in.</div>';
+  }catch(e){
+    document.getElementById('s-err').innerHTML=`<div class="auth-err">${e.message}</div>`;
+  }
+}
+
+function doLogout(){
+  _token=null; _user=null;
+  localStorage.removeItem('scnro_token');
+  localStorage.removeItem('scnro_user');
+  showScreen('screen-login');
+}
+
+// ── App init ───────────────────────────────────────────────────────────────
+function initApp(){
+  if(!_user){showScreen('screen-login');return;}
+  showScreen('screen-app');
+  document.getElementById('hdr-name').textContent=_user.name;
+  const rb=document.getElementById('hdr-role');
+  rb.textContent=_user.role.replace('_',' ');
+  rb.className='role-badge role-'+_user.role;
+  buildNav();
+  switchTab(defaultTab());
+}
+
+function defaultTab(){
+  switch(_user.role){
+    case 'admin':      return 'admin_panel';
+    case 'teacher':    return 'marks_mgmt';
+    case 'student':    return 'my_grades';
+    case 'sac':        return 'lostfound';
+    case 'head_clerk': return 'room_mgmt';
+    default:           return 'dashboard';
+  }
+}
+
+const TABS_ALL=['dashboard','free_rooms','navigate','lostfound','faculty'];
+const TABS_ROLE={
+  admin:     ['admin_panel',...TABS_ALL],
+  teacher:   ['marks_mgmt',...TABS_ALL],
+  student:   ['my_grades',...TABS_ALL],
+  sac:       [...TABS_ALL],
+  head_clerk:['room_mgmt','free_rooms','navigate','faculty'],
+};
+const TAB_LABELS={
+  dashboard:'🏠 Dashboard', free_rooms:'🚪 Free Rooms', navigate:'🗺️ Navigate',
+  lostfound:'🔍 Lost & Found', faculty:'👩‍🏫 Faculty',
+  admin_panel:'⚙️ Admin', marks_mgmt:'📝 Marks', my_grades:'📊 My Grades',
+  room_mgmt:'🏢 Room Mgmt',
+};
+
+function buildNav(){
+  const tabs=(TABS_ROLE[_user.role]||TABS_ALL);
+  const nav=document.getElementById('main-nav');
+  nav.innerHTML=tabs.map(t=>`<button id="nav-${t}" onclick="switchTab('${t}')">${TAB_LABELS[t]||t}</button>`).join('');
+}
+
+// Lazy-load flags
+const _loaded={};
+
+function switchTab(name){
+  _currentTab=name;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  const nb=document.getElementById('nav-'+name);
+  if(nb) nb.classList.add('active');
+  const mc=document.getElementById('main-content');
+  mc.innerHTML='<div class="spinner"></div>';
+
+  switch(name){
+    case 'dashboard':   renderDashboard(); break;
+    case 'free_rooms':  renderFreeRooms(); break;
+    case 'navigate':    renderNavigate(); break;
+    case 'lostfound':   renderLostFound(); break;
+    case 'faculty':     renderFaculty(); break;
+    case 'admin_panel': renderAdmin(); break;
+    case 'marks_mgmt':  renderMarks(); break;
+    case 'my_grades':   renderMyGrades(); break;
+    case 'room_mgmt':   renderRoomMgmt(); break;
   }
 }
 
 /* ══════════════════════════════════════════
    DASHBOARD
 ══════════════════════════════════════════ */
-async function loadDashboard() {
-  // Live clock
-  setInterval(() => {
-    document.getElementById('dash-time').textContent = new Date().toLocaleTimeString();
-  }, 1000);
+async function renderDashboard(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Live Campus Overview <small id="dash-clock"></small></div>
+    <div class="stat-row" id="stats-row">
+      <div class="stat-card"><div class="val" id="s-rooms">–</div><div class="lbl">Free Rooms</div></div>
+      <div class="stat-card"><div class="val" id="s-lost">–</div><div class="lbl">Lost Items</div></div>
+      <div class="stat-card"><div class="val" id="s-found">–</div><div class="lbl">Found Items</div></div>
+      <div class="stat-card"><div class="val" id="s-fac">–</div><div class="lbl">Faculty</div></div>
+    </div>
+    <div class="section-title">Top Free Rooms <button class="btn btn-outline btn-sm" onclick="switchTab('free_rooms')">See all →</button></div>
+    <div class="grid-3" id="d-rooms"><div class="spinner"></div></div>
+    <div class="section-title" style="margin-top:16px">Recent Lost & Found <button class="btn btn-outline btn-sm" onclick="switchTab('lostfound')">See all →</button></div>
+    <div id="d-lf"><div class="spinner"></div></div>`;
 
-  try {
-    const [rooms, lostItems, foundItems] = await Promise.all([
-      apiFetch('/api/v1/resources/available?user_lat=31.4826&user_lng=74.3036'),
-      apiFetch('/api/v1/items?status=Lost'),
-      apiFetch('/api/v1/items?status=Found'),
+  setInterval(()=>{
+    const el=document.getElementById('dash-clock');
+    if(el) el.textContent=new Date().toLocaleTimeString();
+  },1000);
+
+  try{
+    const [rooms,lostR,foundR]=await Promise.all([
+      api('/api/v1/resources/available?user_lat=31.4826&user_lng=74.3036'),
+      api('/api/v1/items?status=Lost'),
+      api('/api/v1/items?status=Found'),
     ]);
+    setHtml('s-rooms',rooms.available_rooms.length);
+    setHtml('s-lost',lostR.items.length);
+    setHtml('s-found',foundR.items.length);
+    const el=document.getElementById('d-rooms');
+    if(el) el.innerHTML=rooms.available_rooms.slice(0,3).map(roomCard).join('')||'<div class="empty"><div class="icon">✅</div>All rooms occupied</div>';
+    const recent=[...lostR.items,...foundR.items].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,3);
+    const dl=document.getElementById('d-lf');
+    if(dl) dl.innerHTML=recent.map(lfCard).join('')||'<div class="empty"><div class="icon">📋</div>No items yet</div>';
+  }catch(e){setHtml('d-rooms',errHtml(e.message));}
 
-    document.getElementById('stat-free').textContent = rooms.available_rooms.length;
-    document.getElementById('stat-lost').textContent = lostItems.items.length;
-    document.getElementById('stat-found').textContent = foundItems.items.length;
-
-    // Top 3 rooms
-    const top3 = rooms.available_rooms.slice(0, 3);
-    setHtml('dash-rooms', top3.length
-      ? top3.map(roomCard).join('')
-      : '<div class="empty"><div class="icon">✅</div>All rooms are currently in use</div>');
-
-    // Recent LF
-    const recent = [...lostItems.items, ...foundItems.items]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 3);
-    setHtml('dash-lf', recent.length
-      ? recent.map(lfCard).join('')
-      : '<div class="empty"><div class="icon">📋</div>No items reported yet</div>');
-  } catch (e) {
-    document.getElementById('dash-rooms').innerHTML = errHtml('Could not load data: ' + e.message);
-  }
-
-  // Faculty count
-  try {
-    const fac = await apiFetch('/api/v1/faculty/search?name=');
-    document.getElementById('stat-faculty').textContent = fac.faculty?.length ?? '–';
-  } catch {
-    // try a broad search
-    try {
-      const fac = await apiFetch('/api/v1/faculty/search?name=a');
-      document.getElementById('stat-faculty').textContent = fac.faculty?.length ?? '–';
-    } catch { /* ignore */ }
-  }
+  try{const d=await api('/api/v1/faculty/search?name=a');setHtml('s-fac',d.faculty?.length??'–');}catch{}
 }
 
 /* ══════════════════════════════════════════
-   ROOMS
+   FREE ROOMS
 ══════════════════════════════════════════ */
-let _roomsLoaded = false;
-
-function roomCard(r) {
-  const pct = Math.min(100, (r.free_minutes / MAX_FREE_MINUTES) * 100);
-  const freeText = r.free_minutes >= 999 ? 'Free all day' : `Free for ${r.free_minutes} min`;
-  const badge = r.category === 'Lab' ? 'badge-blue' : 'badge-green';
-  return `
-  <div class="room-card">
-    <span class="room-score">#${r.location_id}</span>
+function roomCard(r){
+  const pct=Math.min(100,(r.free_minutes/MAX_FREE_MINUTES)*100);
+  const freeText=r.free_minutes>=999?'Free all day':`Free ${r.free_minutes} min`;
+  return`<div class="room-card">
     <div class="room-name">${r.name}</div>
-    <div class="room-meta">
-      🏢 ${r.wing_name || '–'} · Floor ${r.floor_level ?? '?'}<br>
-      📏 ${r.distance_m.toFixed(0)} m away · ${freeText}
-      ${r.free_until ? ` (until ${r.free_until})` : ''}
-    </div>
+    <div class="room-meta">🏢 ${r.wing_name||'–'} · Floor ${r.floor_level??'?'}<br>📏 ${r.distance_m.toFixed(0)} m · ${freeText}</div>
     <div class="free-bar"><div class="free-bar-fill" style="width:${pct}%"></div></div>
-    <span class="badge ${badge}">${r.category || 'Room'}</span>
-    <button class="btn btn-outline btn-sm" style="float:right"
-      onclick="navigateToRoom(${r.location_id}, '${r.name.replace(/'/g,"\\'")}')">Navigate</button>
+    <span class="badge badge-blue">${r.category||'Room'}</span>
+    <button class="btn btn-outline btn-sm" style="float:right" onclick="navToRoom(${r.location_id})">Navigate</button>
   </div>`;
 }
 
-async function loadRooms() {
-  _roomsLoaded = true;
-  const lat = parseFloat(document.getElementById('user-lat')?.value || '31.4826');
-  const lng = parseFloat(document.getElementById('user-lng')?.value || '74.3036');
-  setHtml('rooms-container', spinner());
-  try {
-    const data = await apiFetch(`/api/v1/resources/available?user_lat=${lat}&user_lng=${lng}`);
-    const rooms = data.available_rooms;
-    setHtml('rooms-container', rooms.length
-      ? `<div class="grid grid-3">${rooms.map(roomCard).join('')}</div>`
-      : '<div class="empty"><div class="icon">🎓</div>All rooms are currently occupied</div>');
-  } catch (e) {
-    setHtml('rooms-container', errHtml(e.message));
-  }
+async function renderFreeRooms(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Available Rooms & Labs <small>Ranked by proximity</small></div>
+    <div class="card" style="padding:14px">
+      <div class="input-row">
+        <input id="u-lat" class="grow" type="number" step="any" value="31.4826" aria-label="User latitude coordinate"/>
+        <input id="u-lng" class="grow" type="number" step="any" value="74.3036" aria-label="User longitude coordinate"/>
+        <button class="btn btn-primary" onclick="loadFreeRooms()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div id="rooms-list"><div class="spinner"></div></div>`;
+  await loadFreeRooms();
 }
 
-function navigateToRoom(id, name) {
-  // switch to navigate tab and pre-fill destination
-  switchTab('navigate', document.querySelector('[onclick*=navigate]'));
-  setTimeout(() => {
-    const sel = document.getElementById('nav-to');
-    if (sel) {
-      sel.value = id;
-      getPath();
-    }
-  }, TAB_SWITCH_DELAY_MS);
+async function loadFreeRooms(){
+  const lat=parseFloat(document.getElementById('u-lat')?.value||'31.4826');
+  const lng=parseFloat(document.getElementById('u-lng')?.value||'74.3036');
+  setHtml('rooms-list',spinner());
+  try{
+    const d=await api(`/api/v1/resources/available?user_lat=${lat}&user_lng=${lng}`);
+    const r=d.available_rooms;
+    setHtml('rooms-list',r.length?`<div class="grid-3">${r.map(roomCard).join('')}</div>`:'<div class="empty"><div class="icon">🎓</div>All rooms occupied</div>');
+  }catch(e){setHtml('rooms-list',errHtml(e.message));}
+}
+
+function navToRoom(id){
+  switchTab('navigate');
+  setTimeout(()=>{
+    const s=document.getElementById('nav-to');
+    if(s){s.value=id;getPath();}
+  },TAB_SWITCH_DELAY);
 }
 
 /* ══════════════════════════════════════════
-   NAVIGATION
+   NAVIGATE
 ══════════════════════════════════════════ */
-let _navLoaded = false;
+const LOCS={1:'Main Entrance',2:'CS Block Corridor',3:'Computer Lab 1',4:'Computer Lab 2',5:'Computer Lab 3',6:'Computer Lab 4',7:'Seminar Hall',8:'Faculty Block',9:'Dean Office',10:'Cafeteria',11:'Lecture Hall A',12:'Lecture Hall B',13:'Library',14:'Project Room 1',15:'Project Room 2'};
+const NODE_POS={1:{x:.30,y:.60},2:{x:.45,y:.50},3:{x:.58,y:.40},4:{x:.62,y:.46},5:{x:.66,y:.52},6:{x:.70,y:.36},7:{x:.42,y:.42},8:{x:.72,y:.44},9:{x:.80,y:.38},10:{x:.20,y:.70},11:{x:.84,y:.42},12:{x:.88,y:.36},13:{x:.15,y:.55},14:{x:.82,y:.52},15:{x:.86,y:.58}};
+const EDGES=[[1,2],[1,10],[2,3],[2,4],[2,7],[3,4],[4,5],[5,6],[2,8],[8,9]];
 
-// Hard-coded location list (mirrors seed data; also fetched dynamically)
-const LOCATIONS = {
-  1: 'Main Entrance',
-  2: 'CS Block Corridor',
-  3: 'Computer Lab 1',
-  4: 'Computer Lab 2',
-  5: 'Computer Lab 3',
-  6: 'Computer Lab 4',
-  7: 'Seminar Hall',
-  8: 'Faculty Block',
-  9: 'Dean Office',
-  10: 'Cafeteria',
-  11: 'Lecture Hall A',
-  12: 'Lecture Hall B',
-  13: 'Library',
-  14: 'Project Room 1',
-  15: 'Project Room 2',
-};
-
-// Node positions for canvas rendering (scaled to canvas)
-const NODE_POS = {
-  1:  { x: 0.30, y: 0.60 },
-  2:  { x: 0.45, y: 0.50 },
-  3:  { x: 0.58, y: 0.40 },
-  4:  { x: 0.62, y: 0.46 },
-  5:  { x: 0.66, y: 0.52 },
-  6:  { x: 0.70, y: 0.36 },
-  7:  { x: 0.42, y: 0.42 },
-  8:  { x: 0.72, y: 0.44 },
-  9:  { x: 0.80, y: 0.38 },
-  10: { x: 0.20, y: 0.70 },
-  11: { x: 0.84, y: 0.42 },
-  12: { x: 0.88, y: 0.36 },
-  13: { x: 0.15, y: 0.55 },
-  14: { x: 0.82, y: 0.52 },
-  15: { x: 0.86, y: 0.58 },
-};
-
-const EDGES = [[1,2],[1,10],[2,3],[2,4],[2,7],[3,4],[4,5],[5,6],[2,8],[8,9]];
-
-function loadNavLocations() {
-  _navLoaded = true;
-  const fromSel = document.getElementById('nav-from');
-  const toSel = document.getElementById('nav-to');
-  Object.entries(LOCATIONS).forEach(([id, name]) => {
-    if (id !== '1') {
-      const o1 = new Option(name, id);
-      fromSel.appendChild(o1);
-    }
-    const o2 = new Option(name + ` (#${id})`, id);
-    toSel.appendChild(o2);
-  });
+function renderNavigate(){
+  const mc=document.getElementById('main-content');
+  const opts=Object.entries(LOCS).map(([id,n])=>`<option value="${id}">${n}</option>`).join('');
+  mc.innerHTML=`
+    <div class="section-title">Indoor Navigation <small>Dijkstra shortest path</small></div>
+    <div class="card">
+      <div class="input-row">
+        <select id="nav-from" class="grow"><option value="1">Main Entrance (default)</option>${opts}</select>
+        <select id="nav-to" class="grow"><option value="">– Select destination –</option>${opts}</select>
+        <button class="btn btn-primary" onclick="getPath()">📍 Find Path</button>
+      </div>
+      <div id="nav-result"></div>
+      <div id="nav-map-wrap" style="margin-top:14px;display:none">
+        <canvas id="nav-canvas"></canvas>
+        <p style="font-size:.73rem;color:var(--muted);margin-top:5px;text-align:center">🟢 Start &nbsp; 🔴 End &nbsp; Blue = path</p>
+      </div>
+    </div>`;
   drawCampusMap([]);
 }
 
-async function getPath() {
-  const from = document.getElementById('nav-from').value;
-  const to = document.getElementById('nav-to').value;
-  if (!to) { toast('Please select a destination'); return; }
-  if (from === to) { toast('Origin and destination are the same'); return; }
-
-  setHtml('nav-result', spinner());
-  document.getElementById('nav-map-wrap').style.display = 'none';
-
-  try {
-    const data = await apiFetch(`/api/v1/navigate?to=${to}&from=${from}`);
-    const pathNodes = data.path_nodes || [];
-    const dist = data.total_distance_m;
-
-    if (!pathNodes.length) {
-      setHtml('nav-result', errHtml('No path found between these locations.'));
-      return;
-    }
-
-    const nodeLabels = pathNodes.map(n => `<span class="path-node">${LOCATIONS[n] || 'Node ' + n}</span>`);
-    const arrows = nodeLabels.map((n, i) => i < nodeLabels.length - 1 ? n + '<span class="path-arrow">→</span>' : n).join('');
-
-    setHtml('nav-result', `
-      <div class="path-container">
-        <strong>📏 Total distance: ${dist.toFixed(0)} metres</strong>
-        <div class="path-nodes" style="margin-top:10px">${arrows}</div>
-      </div>`);
-
-    document.getElementById('nav-map-wrap').style.display = 'block';
-    drawCampusMap(pathNodes, parseInt(from), parseInt(to));
-  } catch (e) {
-    setHtml('nav-result', errHtml(e.message));
-  }
+async function getPath(){
+  const from=document.getElementById('nav-from').value;
+  const to=document.getElementById('nav-to').value;
+  if(!to){toast('Select a destination');return;}
+  if(from===to){toast('Same location');return;}
+  setHtml('nav-result',spinner());
+  document.getElementById('nav-map-wrap').style.display='none';
+  try{
+    const d=await api(`/api/v1/navigate?to=${to}&from=${from}`);
+    const path=d.path_nodes||[];
+    if(!path.length){setHtml('nav-result',errHtml('No path found.'));return;}
+    const arrows=path.map((n,i)=>`<span class="path-node">${LOCS[n]||'#'+n}</span>${i<path.length-1?'<span class="path-arrow">→</span>':''}`).join('');
+    setHtml('nav-result',`<div style="background:var(--primary-light);border:1px solid #90CAF9;border-radius:var(--radius);padding:14px;margin-top:10px"><strong>📏 ${d.total_distance_m.toFixed(0)} metres</strong><div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">${arrows}</div></div>`);
+    document.getElementById('nav-map-wrap').style.display='block';
+    drawCampusMap(path,parseInt(from),parseInt(to));
+  }catch(e){setHtml('nav-result',errHtml(e.message));}
 }
 
-function drawCampusMap(pathNodes, fromNode, toNode) {
-  const canvas = document.getElementById('nav-canvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth;
-  const H = canvas.offsetHeight;
-  canvas.width = W;
-  canvas.height = H;
-
-  // Background
-  ctx.fillStyle = '#EFF3FF';
-  ctx.fillRect(0, 0, W, H);
-
-  function px(n) {
-    const p = NODE_POS[n];
-    return p ? { x: p.x * W, y: p.y * H } : null;
-  }
-
-  // Draw edges
-  ctx.strokeStyle = '#BDBDBD';
-  ctx.lineWidth = 2;
-  EDGES.forEach(([a, b]) => {
-    const pa = px(a), pb = px(b);
-    if (!pa || !pb) return;
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.stroke();
-  });
-
-  // Highlight path edges
-  if (pathNodes.length > 1) {
-    ctx.strokeStyle = '#1565C0';
-    ctx.lineWidth = 4;
-    for (let i = 0; i < pathNodes.length - 1; i++) {
-      const pa = px(pathNodes[i]), pb = px(pathNodes[i + 1]);
-      if (!pa || !pb) continue;
-      ctx.beginPath();
-      ctx.moveTo(pa.x, pa.y);
-      ctx.lineTo(pb.x, pb.y);
-      ctx.stroke();
-    }
-  }
-
-  // Draw nodes
-  Object.entries(NODE_POS).forEach(([id, pos]) => {
-    const nId = parseInt(id);
-    const { x, y } = { x: pos.x * W, y: pos.y * H };
-    const inPath = pathNodes.includes(nId);
-    const isFrom = nId === fromNode;
-    const isTo = nId === toNode;
-
-    ctx.beginPath();
-    ctx.arc(x, y, inPath ? 11 : 8, 0, Math.PI * 2);
-    ctx.fillStyle = isFrom ? '#1B5E20' : isTo ? '#B71C1C' : inPath ? '#1565C0' : '#9E9E9E';
-    ctx.fill();
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Label
-    ctx.fillStyle = '#212121';
-    ctx.font = '11px Segoe UI, sans-serif';
-    ctx.textAlign = 'center';
-    const label = LOCATIONS[nId] ? LOCATIONS[nId].replace('Computer ', 'Lab').replace(' Block', '').replace(' Corridor', '') : `#${nId}`;
-    ctx.fillText(label, x, y + 22);
-  });
-
-  // Legend
-  ctx.fillStyle = '#1B5E20'; ctx.beginPath(); ctx.arc(12, H - 40, 7, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#212121'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('Start', 24, H - 36);
-
-  ctx.fillStyle = '#B71C1C'; ctx.beginPath(); ctx.arc(12, H - 22, 7, 0, Math.PI*2); ctx.fill();
-  ctx.fillText('End', 24, H - 18);
+function drawCampusMap(pathNodes,fromNode,toNode){
+  const canvas=document.getElementById('nav-canvas');
+  if(!canvas) return;
+  const W=canvas.offsetWidth,H=canvas.offsetHeight||260;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#EFF3FF';ctx.fillRect(0,0,W,H);
+  function px(n){const p=NODE_POS[n];return p?{x:p.x*W,y:p.y*H}:null;}
+  ctx.strokeStyle='#BDBDBD';ctx.lineWidth=2;
+  EDGES.forEach(([a,b])=>{const pa=px(a),pb=px(b);if(!pa||!pb)return;ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();});
+  if(pathNodes.length>1){ctx.strokeStyle='#1565C0';ctx.lineWidth=4;for(let i=0;i<pathNodes.length-1;i++){const pa=px(pathNodes[i]),pb=px(pathNodes[i+1]);if(!pa||!pb)continue;ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();}}
+  Object.entries(NODE_POS).forEach(([id,pos])=>{const nId=parseInt(id),{x:px2,y:py2}={x:pos.x*W,y:pos.y*H};const inP=pathNodes.includes(nId);ctx.beginPath();ctx.arc(px2,py2,inP?11:7,0,Math.PI*2);ctx.fillStyle=nId===fromNode?'#1B5E20':nId===toNode?'#B71C1C':inP?'#1565C0':'#9E9E9E';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#212121';ctx.font='10px Segoe UI,sans-serif';ctx.textAlign='center';ctx.fillText((LOCS[nId]||'#'+nId).split(' ')[0],px2,py2+20);});
 }
 
 /* ══════════════════════════════════════════
    LOST & FOUND
 ══════════════════════════════════════════ */
-let _lfLoaded = false;
-let _lfFilter = null;
+let _lfFilter=null;
 
-function lfCard(item) {
-  const badgeClass = item.status === 'Lost' ? 'badge-red' : item.status === 'Found' ? 'badge-green' : 'badge-grey';
-  const when = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
-  return `
-  <div class="lf-card ${item.status}">
+function lfCard(item){
+  const bc=item.status==='Lost'?'badge-red':item.status==='Found'?'badge-green':'badge-grey';
+  const canClose=(_user.role==='admin'||_user.role==='sac')&&item.status!=='Closed';
+  return`<div class="lf-card ${item.status}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div class="item-name">${item.item_name}</div>
-      <span class="badge ${badgeClass}">${item.status}</span>
+      <div style="font-weight:600">${item.item_name}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge ${bc}">${item.status}</span>
+        ${canClose?`<button class="btn btn-danger btn-sm" onclick="closeLF(${item.item_id})">Close</button>`:''}
+      </div>
     </div>
-    ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
-    <div class="item-meta">📅 ${when} &nbsp;·&nbsp; 🆔 Item #${item.item_id ?? '?'}</div>
+    ${item.description?`<div style="font-size:.82rem;color:var(--muted);margin-top:4px">${item.description}</div>`:''}
+    <div style="font-size:.74rem;color:var(--muted);margin-top:6px">📅 ${item.created_at?.slice(0,16)||'?'} · #${item.item_id}</div>
   </div>`;
 }
 
-async function loadLF(status) {
-  _lfLoaded = true;
-  _lfFilter = status || null;
-  const url = '/api/v1/items' + (status ? `?status=${status}` : '');
-  setHtml('lf-container', spinner());
-  try {
-    const data = await apiFetch(url);
-    const items = data.items;
-    setHtml('lf-container', items.length
-      ? items.map(lfCard).join('')
-      : '<div class="empty"><div class="icon">🎉</div>No items found for this filter</div>');
-  } catch (e) {
-    setHtml('lf-container', errHtml(e.message));
-  }
+async function renderLostFound(filter){
+  _lfFilter=filter||null;
+  const mc=document.getElementById('main-content');
+  const canReport=!!_user;
+  mc.innerHTML=`
+    <div class="section-title">Lost & Found Community Board</div>
+    ${canReport?`<div class="card">
+      <div class="card-title">➕ Report an Item</div>
+      <div class="form-grid">
+        <div class="form-field"><label>Item Name *</label><input id="lf-name" required placeholder="e.g. Black Wallet"/></div>
+        <div class="form-field"><label>Status *</label><select id="lf-status"><option value="Lost">Lost</option><option value="Found">Found</option></select></div>
+        <div class="form-field" style="grid-column:1/-1"><label>Description</label><textarea id="lf-desc" placeholder="Colour, brand, contents..."></textarea></div>
+      </div>
+      <button class="btn btn-primary" onclick="reportLF()">Submit Report</button>
+    </div>`:''}
+    <div class="chips" id="lf-chips">
+      <span class="chip ${!_lfFilter?'active':''}" onclick="filterLF(null,this)">All</span>
+      <span class="chip ${_lfFilter==='Lost'?'active':''}" onclick="filterLF('Lost',this)">Lost</span>
+      <span class="chip ${_lfFilter==='Found'?'active':''}" onclick="filterLF('Found',this)">Found</span>
+      <span class="chip ${_lfFilter==='Claimed'?'active':''}" onclick="filterLF('Claimed',this)">Claimed</span>
+      <span class="chip ${_lfFilter==='Closed'?'active':''}" onclick="filterLF('Closed',this)">Closed</span>
+    </div>
+    <div id="lf-list"><div class="spinner"></div></div>`;
+  await loadLF(_lfFilter);
 }
 
-function filterLF(status, chip) {
-  document.querySelectorAll('.chips .chip').forEach(c => c.classList.remove('active'));
-  chip.classList.add('active');
-  loadLF(status);
+function filterLF(f,chip){
+  _lfFilter=f;
+  document.querySelectorAll('#lf-chips .chip').forEach(c=>c.classList.remove('active'));
+  if(chip) chip.classList.add('active');
+  loadLF(f);
 }
 
-async function reportItem() {
-  const name = document.getElementById('lf-name').value.trim();
-  const status = document.getElementById('lf-status').value;
-  const desc = document.getElementById('lf-desc').value.trim();
+async function loadLF(filter){
+  setHtml('lf-list',spinner());
+  try{
+    const url='/api/v1/items'+(filter?`?status=${filter}`:'');
+    const d=await api(url);
+    setHtml('lf-list',d.items.length?d.items.map(lfCard).join(''):'<div class="empty"><div class="icon">📭</div>No items found</div>');
+  }catch(e){setHtml('lf-list',errHtml(e.message));}
+}
 
-  if (!name) { toast('Please enter an item name'); return; }
-
-  try {
-    await apiPost('/api/v1/items/report', {
-      user_id: DEFAULT_USER_ID,
-      item_name: name,
-      status,
-      description: desc || undefined,
-    });
-    toast('✅ Item reported successfully!');
-    document.getElementById('lf-name').value = '';
-    document.getElementById('lf-desc').value = '';
+async function reportLF(){
+  const name=document.getElementById('lf-name')?.value.trim();
+  const status=document.getElementById('lf-status')?.value;
+  const desc=document.getElementById('lf-desc')?.value.trim();
+  if(!name){toast('Enter item name');return;}
+  try{
+    await api('/api/v1/items/report',{method:'POST',body:JSON.stringify({user_id:_user.user_id,item_name:name,status,description:desc||undefined})});
+    toast('✅ Report submitted!');
+    document.getElementById('lf-name').value='';
+    document.getElementById('lf-desc').value='';
     loadLF(_lfFilter);
-  } catch (e) {
-    toast('❌ Error: ' + e.message);
-  }
+  }catch(e){toast('❌ '+e.message);}
+}
+
+async function closeLF(id){
+  if(!confirm('Close this lost & found report?')) return;
+  try{
+    await api(`/api/v1/admin/lost-found/${id}/close`,{method:'PATCH'});
+    toast('✅ Report closed.');
+    loadLF(_lfFilter);
+  }catch(e){toast('❌ '+e.message);}
 }
 
 /* ══════════════════════════════════════════
    FACULTY
 ══════════════════════════════════════════ */
-let _searchTimer = null;
+let _facSearchTimer=null;
 
-function facultyCard(f) {
-  const initials = f.name.split(' ').map(w => w[0]).slice(0, 2).join('');
-  const availBadge = f.is_available
-    ? '<span class="badge badge-green">Available</span>'
-    : '<span class="badge badge-grey">Unavailable</span>';
-  const office = f.office
-    ? `🏢 ${f.office.name} · ${f.office.wing_name || ''} · Floor ${f.office.floor_level ?? '?'}`
-    : '🏢 Office not listed';
+async function renderFaculty(){
+  const isAdmin=_user.role==='admin';
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Faculty Directory ${isAdmin?'<button class="btn btn-primary btn-sm" onclick="showAddFacultyModal()">+ Add Faculty</button>':''}</div>
+    <div class="input-row">
+      <input id="fac-search" class="grow" placeholder="Search by name..." oninput="searchFac(this.value)"/>
+      <button class="btn btn-primary" onclick="searchFac(document.getElementById('fac-search').value)">🔍</button>
+    </div>
+    <div id="fac-list"><div class="empty"><div class="icon">👩‍🏫</div>Type a name to search</div></div>`;
+}
 
-  const navBtn = f.office
-    ? `<button class="btn btn-outline btn-sm"
-        onclick="navigateToRoom(${f.office.location_id}, '${f.office.name.replace(/'/g,"\\'")}')">
-        🗺️ Navigate to Office</button>`
-    : '';
+function searchFac(q){
+  clearTimeout(_facSearchTimer);
+  if(!q.trim()){setHtml('fac-list','<div class="empty"><div class="icon">👩‍🏫</div>Type a name to search</div>');return;}
+  _facSearchTimer=setTimeout(async()=>{
+    setHtml('fac-list',spinner());
+    try{
+      const d=await api(`/api/v1/faculty/search?name=${encodeURIComponent(q.trim())}`);
+      if(!d.faculty.length){setHtml('fac-list','<div class="empty"><div class="icon">🔍</div>No results</div>');return;}
+      setHtml('fac-list',d.faculty.map(facCard).join(''));
+    }catch(e){setHtml('fac-list',errHtml(e.message));}
+  },300);
+}
 
-  return `
-  <div class="faculty-card">
+function facCard(f){
+  const initials=f.name.split(' ').map(w=>w[0]).slice(0,2).join('');
+  const isAdmin=_user.role==='admin';
+  return`<div class="faculty-card">
     <div class="avatar">${initials}</div>
-    <div class="faculty-info" style="flex:1">
-      <div class="name">${f.name} ${availBadge}</div>
-      <div class="designation">${f.designation || ''} · ${f.department || ''}</div>
-      <div style="font-size:0.78rem;color:var(--muted)">${office}</div>
-      <div class="faculty-actions">${navBtn}</div>
+    <div style="flex:1">
+      <div style="font-weight:600">${f.name} <span class="badge ${f.is_available?'badge-green':'badge-grey'}">${f.is_available?'Available':'Unavailable'}</span></div>
+      <div style="font-size:.8rem;color:var(--muted)">${f.designation||''} · ${f.department||''}</div>
+      ${f.office?`<div style="font-size:.76rem;color:var(--muted)">🏢 ${f.office.name} · ${f.office.wing_name||''} · Floor ${f.office.floor_level??'?'}</div>`:''}
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${f.office?`<button class="btn btn-outline btn-sm" onclick="navToRoom(${f.office.location_id})">🗺️ Navigate</button>`:''}
+        ${isAdmin?`<button class="btn btn-outline btn-sm" onclick="editFaculty(${f.faculty_id},'${f.name.replace(/'/g,"\\'")}','${f.designation||''}','${f.department||''}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFaculty(${f.faculty_id})">🗑️ Delete</button>`:''}
+      </div>
     </div>
   </div>`;
 }
 
-function searchFaculty(query) {
-  clearTimeout(_searchTimer);
-  if (!query.trim()) {
-    setHtml('faculty-container', '<div class="empty"><div class="icon">👩‍🏫</div>Type a name to search</div>');
-    return;
-  }
-  _searchTimer = setTimeout(async () => {
-    setHtml('faculty-container', spinner());
-    try {
-      const data = await apiFetch(`/api/v1/faculty/search?name=${encodeURIComponent(query.trim())}`);
-      const faculty = data.faculty;
-      setHtml('faculty-container', faculty.length
-        ? faculty.map(facultyCard).join('')
-        : '<div class="empty"><div class="icon">🔍</div>No faculty found for that name</div>');
-    } catch (e) {
-      setHtml('faculty-container', errHtml(e.message));
-    }
-  }, TAB_SWITCH_DELAY_MS);
+function showAddFacultyModal(){
+  const m=openModal(`<h2>Add Faculty</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Name *</label><input id="af-name"/></div>
+      <div class="form-field"><label>Designation</label><input id="af-desig"/></div>
+      <div class="form-field"><label>Department</label><input id="af-dept"/></div>
+      <div class="form-field"><label>Is Available</label><select id="af-avail"><option value="true">Yes</option><option value="false">No</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddFaculty()">Add</button>
+    </div>`);
 }
+
+async function submitAddFaculty(){
+  const name=document.getElementById('af-name').value.trim();
+  if(!name){toast('Name required');return;}
+  try{
+    await api('/api/v1/admin/faculty',{method:'POST',body:JSON.stringify({
+      name, designation:document.getElementById('af-desig').value,
+      department:document.getElementById('af-dept').value,
+      is_available:document.getElementById('af-avail').value==='true',
+    })});
+    toast('✅ Faculty added.'); closeModal(); searchFac(document.getElementById('fac-search').value||'a');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+function editFaculty(id,name,desig,dept){
+  openModal(`<h2>Edit Faculty #${id}</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Name</label><input id="ef-name" value="${name}"/></div>
+      <div class="form-field"><label>Designation</label><input id="ef-desig" value="${desig}"/></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Department</label><input id="ef-dept" value="${dept}"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditFaculty(${id})">Save</button>
+    </div>`);
+}
+
+async function submitEditFaculty(id){
+  try{
+    await api(`/api/v1/admin/faculty/${id}`,{method:'PUT',body:JSON.stringify({
+      name:document.getElementById('ef-name').value,
+      designation:document.getElementById('ef-desig').value,
+      department:document.getElementById('ef-dept').value,
+    })});
+    toast('✅ Updated.'); closeModal(); searchFac(document.getElementById('fac-search').value||'a');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+async function deleteFaculty(id){
+  if(!confirm('Delete this faculty entry?')) return;
+  try{await api(`/api/v1/admin/faculty/${id}`,{method:'DELETE'});toast('✅ Deleted.');searchFac(document.getElementById('fac-search').value||'a');}
+  catch(e){toast('❌ '+e.message);}
+}
+
+/* ══════════════════════════════════════════
+   ADMIN PANEL
+══════════════════════════════════════════ */
+let _adminTab='requests';
+
+async function renderAdmin(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Admin Panel</div>
+    <div class="chips" id="admin-chips">
+      <span class="chip active" onclick="adminTab('requests',this)">📋 Signup Requests</span>
+      <span class="chip" onclick="adminTab('staff',this)">�� Staff Management</span>
+    </div>
+    <div id="admin-body"><div class="spinner"></div></div>`;
+  adminTab('requests');
+}
+
+function adminTab(t,chip){
+  _adminTab=t;
+  document.querySelectorAll('#admin-chips .chip').forEach(c=>c.classList.remove('active'));
+  if(chip) chip.classList.add('active');
+  if(t==='requests') loadSignupRequests();
+  else loadStaff();
+}
+
+async function loadSignupRequests(){
+  setHtml('admin-body',spinner());
+  try{
+    const d=await api('/api/v1/admin/signup-requests?status=pending');
+    if(!d.requests.length){setHtml('admin-body','<div class="empty"><div class="icon">📋</div>No pending requests</div>');return;}
+    setHtml('admin-body',`
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Submitted</th><th>Actions</th></tr></thead>
+        <tbody>${d.requests.map(r=>`<tr>
+          <td>${r.request_id}</td><td>${r.name}</td><td>${r.email}</td>
+          <td><span class="badge badge-blue">${r.role_requested}</span></td>
+          <td>${r.created_at?.slice(0,16)||'?'}</td>
+          <td><button class="btn btn-success btn-sm" onclick="approveReq(${r.request_id})">✅ Approve</button>
+              <button class="btn btn-danger btn-sm" style="margin-left:6px" onclick="rejectReq(${r.request_id})">❌ Reject</button></td>
+        </tr>`).join('')}</tbody>
+      </table></div>`);
+  }catch(e){setHtml('admin-body',errHtml(e.message));}
+}
+
+async function approveReq(id){
+  try{await api(`/api/v1/admin/signup-requests/${id}/approve`,{method:'POST'});toast('✅ Approved & user created.');loadSignupRequests();}
+  catch(e){toast('❌ '+e.message);}
+}
+async function rejectReq(id){
+  if(!confirm('Reject this request?')) return;
+  try{await api(`/api/v1/admin/signup-requests/${id}/reject`,{method:'POST'});toast('Request rejected.');loadSignupRequests();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function loadStaff(){
+  setHtml('admin-body',spinner());
+  try{
+    const d=await api('/api/v1/admin/staff');
+    setHtml('admin-body',`
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn-primary" onclick="showAddStaffModal()">+ Add Staff</button>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${d.staff.map(u=>`<tr>
+          <td>${u.user_id}</td><td>${u.name}</td><td>${u.email}</td>
+          <td><span class="badge badge-blue">${u.role}</span></td>
+          <td><span class="badge ${u.is_active?'badge-green':'badge-grey'}">${u.is_active?'Active':'Inactive'}</span></td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="editStaff(${u.user_id},'${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}')">✏️ Edit</button>
+            ${u.is_active?`<button class="btn btn-danger btn-sm" style="margin-left:6px" onclick="deactivateStaff(${u.user_id})">🗑️ Deactivate</button>`:''}
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`);
+  }catch(e){setHtml('admin-body',errHtml(e.message));}
+}
+
+function showAddStaffModal(){
+  openModal(`<h2>Add Staff Member</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Full Name *</label><input id="as-name"/></div>
+      <div class="form-field"><label>Email *</label><input id="as-email" type="email"/></div>
+      <div class="form-field"><label>Password *</label><input id="as-pass" type="password" placeholder="Min 6 chars"/></div>
+      <div class="form-field"><label>Role *</label><select id="as-role">
+        <option value="student">Student</option><option value="teacher">Teacher</option>
+        <option value="sac">SAC Officer</option><option value="head_clerk">Head Clerk</option>
+        <option value="admin">Admin</option>
+      </select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddStaff()">Create</button>
+    </div>`);
+}
+
+async function submitAddStaff(){
+  const body={name:document.getElementById('as-name').value,email:document.getElementById('as-email').value,
+    password:document.getElementById('as-pass').value,role:document.getElementById('as-role').value};
+  if(!body.name||!body.email||!body.password){toast('Fill all required fields');return;}
+  try{await api('/api/v1/admin/staff',{method:'POST',body:JSON.stringify(body)});toast('✅ Staff created.');closeModal();loadStaff();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+function editStaff(id,name,email,role){
+  openModal(`<h2>Edit Staff #${id}</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Name</label><input id="es-name" value="${name}"/></div>
+      <div class="form-field"><label>Email</label><input id="es-email" value="${email}"/></div>
+      <div class="form-field"><label>New Password</label><input id="es-pass" type="password" placeholder="Leave blank to keep"/></div>
+      <div class="form-field"><label>Role</label><select id="es-role">
+        <option value="student" ${role==='student'?'selected':''}>Student</option>
+        <option value="teacher" ${role==='teacher'?'selected':''}>Teacher</option>
+        <option value="sac" ${role==='sac'?'selected':''}>SAC Officer</option>
+        <option value="head_clerk" ${role==='head_clerk'?'selected':''}>Head Clerk</option>
+        <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
+      </select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditStaff(${id})">Save</button>
+    </div>`);
+}
+
+async function submitEditStaff(id){
+  const body={name:document.getElementById('es-name').value,email:document.getElementById('es-email').value,role:document.getElementById('es-role').value};
+  const p=document.getElementById('es-pass').value;if(p)body.password=p;
+  try{await api(`/api/v1/admin/staff/${id}`,{method:'PUT',body:JSON.stringify(body)});toast('✅ Updated.');closeModal();loadStaff();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function deactivateStaff(id){
+  if(!confirm('Deactivate this user?')) return;
+  try{await api(`/api/v1/admin/staff/${id}`,{method:'DELETE'});toast('User deactivated.');loadStaff();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+/* ══════════════════════════════════════════
+   MARKS MANAGEMENT (TEACHER)
+══════════════════════════════════════════ */
+let _selCourse=null;
+let _selCourseStudents=[];
+const CATS=['attendance','quiz','activity','mid','final'];
+
+async function renderMarks(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Marks Management</div>
+    <div id="marks-body"><div class="spinner"></div></div>`;
+  await loadMarksCourses();
+}
+
+async function loadMarksCourses(){
+  setHtml('marks-body',spinner());
+  try{
+    const d=await api('/api/v1/courses');
+    if(!d.courses.length){
+      setHtml('marks-body',`<div class="empty"><div class="icon">📚</div>No courses assigned<br><button class="btn btn-primary" style="margin-top:14px" onclick="showAddCourseModal()">+ Create Course</button></div>`);
+      return;
+    }
+    setHtml('marks-body',`
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+        <select id="course-sel" class="grow" onchange="selectCourse(this.value)">
+          <option value="">– Select Course –</option>
+          ${d.courses.map(c=>`<option value="${c.course_id}">${c.code} – ${c.name} (${c.section||'–'})</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" onclick="showAddCourseModal()">+ New Course</button>
+      </div>
+      <div id="course-detail"></div>`);
+  }catch(e){setHtml('marks-body',errHtml(e.message));}
+}
+
+async function selectCourse(cid){
+  if(!cid){setHtml('course-detail','');return;}
+  _selCourse=parseInt(cid);
+  setHtml('course-detail',spinner());
+  try{
+    const [stud,marksD]=await Promise.all([
+      api(`/api/v1/courses/${cid}/students`),
+      api(`/api/v1/courses/${cid}/marks`),
+    ]);
+    _selCourseStudents=stud.students;
+    renderCourseMarks(marksD);
+  }catch(e){setHtml('course-detail',errHtml(e.message));}
+}
+
+function renderCourseMarks(marksD){
+  const students=_selCourseStudents;
+  const marks=marksD.marks;
+  const locks=marksD.locks||{};
+
+  // Build per-student, per-category map
+  const byStudent={};
+  students.forEach(s=>{byStudent[s.student_id]={...s,byCat:{}}; CATS.forEach(c=>{byStudent[s.student_id].byCat[c]=[];});});
+  marks.forEach(m=>{if(byStudent[m.student_id]&&byStudent[m.student_id].byCat[m.category])byStudent[m.student_id].byCat[m.category].push(m);});
+
+  const lockBadges=CATS.map(c=>locks[c]?`<span class="lock-badge">🔒 ${c}</span>`:`<button class="btn btn-outline btn-sm" onclick="finalizeCategory('${c}')">Finalize ${c}</button>`).join(' ');
+
+  let html=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <button class="btn btn-primary" onclick="showAddMarkModal()">+ Add Mark</button>
+    <button class="btn btn-success" onclick="showEnrollModal()">+ Enroll Student</button>
+    <button class="btn btn-amber" onclick="downloadPDF()">📄 Print PDF</button>
+  </div>
+  <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">${lockBadges}</div>`;
+
+  if(!students.length){html+='<div class="empty"><div class="icon">👨‍🎓</div>No students enrolled</div>';}
+  else{
+    html+=`<div class="tbl-wrap"><table>
+      <thead><tr><th>Student</th><th>Attendance</th><th>Quiz(s)</th><th>Activity(s)</th><th>Mid</th><th>Final</th><th>Actions</th></tr></thead>
+      <tbody>${students.map(s=>{
+        const sd=byStudent[s.student_id];
+        return`<tr>
+          <td><strong>${s.name}</strong><br><small>${s.email}</small></td>
+          ${CATS.map(cat=>`<td>${(sd.byCat[cat]||[]).map(m=>`<div>${m.title}: <strong>${m.marks_obtained??'–'}/${m.total_marks??'–'}</strong> ${!locks[cat]?`<button class="btn btn-sm" style="padding:2px 6px" onclick="deleteMarkRecord(${m.record_id})">🗑️</button>`:''}</div>`).join('')||'–'}</td>`).join('')}
+          <td><button class="btn btn-outline btn-sm" onclick="showUnenrollModal(${s.student_id},'${s.name.replace(/'/g,"\\'")}')">Remove</button></td>
+        </tr>`;}).join('')}</tbody>
+    </table></div>`;
+  }
+  setHtml('course-detail',html);
+}
+
+async function finalizeCategory(cat){
+  if(!confirm(`Finalize "${cat}" for this course? This cannot be undone without admin.`)) return;
+  try{
+    await api(`/api/v1/courses/${_selCourse}/finalize?category=${cat}`,{method:'POST'});
+    toast(`✅ ${cat} finalized.`); selectCourse(_selCourse);
+  }catch(e){toast('❌ '+e.message);}
+}
+
+function showAddMarkModal(){
+  if(!_selCourseStudents.length){toast('No students enrolled.');return;}
+  const stuOpts=_selCourseStudents.map(s=>`<option value="${s.student_id}">${s.name}</option>`).join('');
+  const catOpts=CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  openModal(`<h2>Add Mark Record</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Student *</label><select id="am-student">${stuOpts}</select></div>
+      <div class="form-field"><label>Category *</label><select id="am-cat">${catOpts}</select></div>
+      <div class="form-field"><label>Title *</label><input id="am-title" placeholder="e.g. Quiz 1"/></div>
+      <div class="form-field"><label>Marks Obtained</label><input id="am-obt" type="number" step="0.1"/></div>
+      <div class="form-field"><label>Total Marks</label><input id="am-tot" type="number" step="0.1"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddMark()">Save</button>
+    </div>`);
+}
+
+async function submitAddMark(){
+  const body={
+    student_id:parseInt(document.getElementById('am-student').value),
+    course_id:_selCourse,
+    category:document.getElementById('am-cat').value,
+    title:document.getElementById('am-title').value,
+    marks_obtained:parseFloat(document.getElementById('am-obt').value)||null,
+    total_marks:parseFloat(document.getElementById('am-tot').value)||null,
+  };
+  if(!body.title){toast('Title required');return;}
+  try{await api('/api/v1/marks',{method:'POST',body:JSON.stringify(body)});toast('✅ Mark saved.');closeModal();selectCourse(_selCourse);}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function deleteMarkRecord(rid){
+  if(!confirm('Delete this mark record?')) return;
+  try{await api(`/api/v1/marks/${rid}`,{method:'DELETE'});toast('Deleted.');selectCourse(_selCourse);}
+  catch(e){toast('❌ '+e.message);}
+}
+
+function showEnrollModal(){
+  openModal(`<h2>Enroll Student</h2>
+    <div class="form-field"><label>Student User ID</label><input id="en-sid" type="number" placeholder="Enter student user_id"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEnroll()">Enroll</button>
+    </div>`);
+}
+
+async function submitEnroll(){
+  const sid=parseInt(document.getElementById('en-sid').value);
+  if(!sid){toast('Enter a student ID');return;}
+  try{await api(`/api/v1/courses/${_selCourse}/enroll?student_id=${sid}`,{method:'POST'});toast('✅ Enrolled.');closeModal();selectCourse(_selCourse);}
+  catch(e){toast('❌ '+e.message);}
+}
+
+function showUnenrollModal(sid,name){
+  if(!confirm(`Remove ${name} from this course?`)) return;
+  api(`/api/v1/courses/${_selCourse}/enroll/${sid}`,{method:'DELETE'}).then(()=>{toast('Removed.');selectCourse(_selCourse);}).catch(e=>toast('❌ '+e.message));
+}
+
+function showAddCourseModal(){
+  openModal(`<h2>Create Course</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Course Code *</label><input id="nc-code" placeholder="e.g. CS-401"/></div>
+      <div class="form-field"><label>Course Name *</label><input id="nc-name" placeholder="e.g. Algorithms"/></div>
+      <div class="form-field"><label>Section</label><input id="nc-sec" placeholder="A"/></div>
+      <div class="form-field"><label>Semester</label><input id="nc-sem" placeholder="Spring 2025"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewCourse()">Create</button>
+    </div>`);
+}
+
+async function submitNewCourse(){
+  const body={code:document.getElementById('nc-code').value,name:document.getElementById('nc-name').value,section:document.getElementById('nc-sec').value,semester:document.getElementById('nc-sem').value};
+  if(!body.code||!body.name){toast('Code and name required');return;}
+  try{await api('/api/v1/courses',{method:'POST',body:JSON.stringify(body)});toast('✅ Course created.');closeModal();loadMarksCourses();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function downloadPDF(){
+  if(!_selCourse){toast('Select a course first');return;}
+  toast('Generating PDF…');
+  try{
+    const blob=await api(`/api/v1/courses/${_selCourse}/report.pdf`);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`course_${_selCourse}_report.pdf`;a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){toast('❌ '+e.message);}
+}
+
+/* ══════════════════════════════════════════
+   MY GRADES (STUDENT)
+══════════════════════════════════════════ */
+async function renderMyGrades(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">My Academic Records</div>
+    <div id="grades-body"><div class="spinner"></div></div>`;
+  try{
+    const d=await api('/api/v1/courses');
+    if(!d.courses.length){setHtml('grades-body','<div class="empty"><div class="icon">📚</div>No courses enrolled</div>');return;}
+    let html=`<div style="display:flex;gap:10px;margin-bottom:14px">
+      <select id="grade-course-sel" class="grow" onchange="loadGrades(this.value)">
+        <option value="">– Select Course –</option>
+        ${d.courses.map(c=>`<option value="${c.course_id}">${c.code} – ${c.name} (${c.section||'–'})</option>`).join('')}
+      </select></div><div id="grade-detail"></div>`;
+    setHtml('grades-body',html);
+  }catch(e){setHtml('grades-body',errHtml(e.message));}
+}
+
+async function loadGrades(cid){
+  if(!cid){setHtml('grade-detail','');return;}
+  setHtml('grade-detail',spinner());
+  try{
+    const d=await api(`/api/v1/courses/${cid}/marks`);
+    const marks=d.marks;
+    const locks=d.locks||{};
+    if(!marks.length){setHtml('grade-detail','<div class="empty"><div class="icon">📋</div>No marks uploaded yet</div>');return;}
+
+    const bycat={};CATS.forEach(c=>{bycat[c]=[];});
+    marks.forEach(m=>{if(bycat[m.category])bycat[m.category].push(m);});
+
+    let html='';
+    CATS.forEach(cat=>{
+      const catMarks=bycat[cat];
+      if(!catMarks.length) return;
+      const lockLabel=locks[cat]?'<span class="lock-badge">🔒 Finalized</span>':'<span class="badge badge-grey">Open</span>';
+      html+=`<div class="card"><div class="card-title">${cat.charAt(0).toUpperCase()+cat.slice(1)} ${lockLabel}</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Title</th><th>Marks Obtained</th><th>Total</th><th>Percentage</th></tr></thead>
+          <tbody>${catMarks.map(m=>{
+            const pct=m.total_marks&&m.marks_obtained?(((m.marks_obtained/m.total_marks)*100).toFixed(1)+'%'):'–';
+            const pctn=m.total_marks&&m.marks_obtained?((m.marks_obtained/m.total_marks)*100):null;
+            const cls=pctn===null?'':pctn>=80?'badge-green':pctn>=60?'badge-amber':'badge-red';
+            return`<tr><td>${m.title}</td><td>${m.marks_obtained??'–'}</td><td>${m.total_marks??'–'}</td><td><span class="badge ${cls}">${pct}</span></td></tr>`;
+          }).join('')}</tbody>
+        </table></div></div>`;
+    });
+    setHtml('grade-detail',html||'<div class="empty">No data</div>');
+  }catch(e){setHtml('grade-detail',errHtml(e.message));}
+}
+
+/* ══════════════════════════════════════════
+   ROOM MANAGEMENT (HEAD CLERK)
+══════════════════════════════════════════ */
+let _rmTab='schedules';
+
+async function renderRoomMgmt(){
+  const mc=document.getElementById('main-content');
+  mc.innerHTML=`
+    <div class="section-title">Room Management</div>
+    <div class="chips" id="rm-chips">
+      <span class="chip active" onclick="rmTab('schedules',this)">📅 Schedules</span>
+      <span class="chip" onclick="rmTab('locations',this)">🏢 Locations</span>
+    </div>
+    <div id="rm-body"><div class="spinner"></div></div>`;
+  rmTab('schedules');
+}
+
+function rmTab(t,chip){
+  _rmTab=t;
+  document.querySelectorAll('#rm-chips .chip').forEach(c=>c.classList.remove('active'));
+  if(chip) chip.classList.add('active');
+  if(t==='schedules') loadSchedules(); else loadLocationsClerk();
+}
+
+const DAY_NAMES=['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+async function loadSchedules(){
+  setHtml('rm-body',spinner());
+  try{
+    const d=await api('/api/v1/clerk/schedules');
+    setHtml('rm-body',`
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn-primary" onclick="showAddScheduleModal()">+ Add Schedule</button>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>ID</th><th>Room</th><th>Course</th><th>Day</th><th>Time</th><th>Section</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>${d.schedules.map(s=>`<tr>
+          <td>${s.schedule_id}</td>
+          <td>${s.location_name||s.location_id}</td>
+          <td>${s.course_code}</td>
+          <td>${DAY_NAMES[s.day_of_week]||s.day_of_week}</td>
+          <td>${s.start_time||'?'}–${s.end_time||'?'}</td>
+          <td>${s.section||'–'}</td>
+          <td>${s.notes||'–'}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="showEditScheduleModal(${s.schedule_id},${s.location_id},'${s.course_code}',${s.day_of_week},'${s.start_time}','${s.end_time}','${s.section||''}','${s.notes||''}')">✏️</button>
+            <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSchedule(${s.schedule_id})">🗑️</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`);
+  }catch(e){setHtml('rm-body',errHtml(e.message));}
+}
+
+function showAddScheduleModal(){
+  openModal(`<h2>Add Schedule</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Location ID *</label><input id="ns-loc" type="number"/></div>
+      <div class="form-field"><label>Course Code *</label><input id="ns-code" placeholder="CS-301"/></div>
+      <div class="form-field"><label>Day (1=Mon…7=Sun) *</label><input id="ns-day" type="number" min="1" max="7"/></div>
+      <div class="form-field"><label>Start Time *</label><input id="ns-st" placeholder="08:00"/></div>
+      <div class="form-field"><label>End Time *</label><input id="ns-et" placeholder="10:00"/></div>
+      <div class="form-field"><label>Section</label><input id="ns-sec"/></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Notes</label><input id="ns-notes"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddSchedule()">Add</button>
+    </div>`);
+}
+
+async function submitAddSchedule(){
+  const body={
+    location_id:parseInt(document.getElementById('ns-loc').value),
+    course_code:document.getElementById('ns-code').value,
+    day_of_week:parseInt(document.getElementById('ns-day').value),
+    start_time:document.getElementById('ns-st').value,
+    end_time:document.getElementById('ns-et').value,
+    section:document.getElementById('ns-sec').value||null,
+    notes:document.getElementById('ns-notes').value||null,
+  };
+  try{await api('/api/v1/clerk/schedules',{method:'POST',body:JSON.stringify(body)});toast('✅ Schedule added.');closeModal();loadSchedules();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+function showEditScheduleModal(id,loc,code,day,st,et,sec,notes){
+  openModal(`<h2>Edit Schedule #${id}</h2>
+    <div class="form-grid">
+      <div class="form-field"><label>Location ID</label><input id="es2-loc" type="number" value="${loc}"/></div>
+      <div class="form-field"><label>Course Code</label><input id="es2-code" value="${code}"/></div>
+      <div class="form-field"><label>Day (1–7)</label><input id="es2-day" type="number" value="${day}"/></div>
+      <div class="form-field"><label>Start Time</label><input id="es2-st" value="${st}"/></div>
+      <div class="form-field"><label>End Time</label><input id="es2-et" value="${et}"/></div>
+      <div class="form-field"><label>Section</label><input id="es2-sec" value="${sec}"/></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Notes</label><input id="es2-notes" value="${notes}"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditSchedule(${id})">Save</button>
+    </div>`);
+}
+
+async function submitEditSchedule(id){
+  const body={
+    location_id:parseInt(document.getElementById('es2-loc').value),
+    course_code:document.getElementById('es2-code').value,
+    day_of_week:parseInt(document.getElementById('es2-day').value),
+    start_time:document.getElementById('es2-st').value,
+    end_time:document.getElementById('es2-et').value,
+    section:document.getElementById('es2-sec').value||null,
+    notes:document.getElementById('es2-notes').value||null,
+  };
+  try{await api(`/api/v1/clerk/schedules/${id}`,{method:'PUT',body:JSON.stringify(body)});toast('✅ Updated.');closeModal();loadSchedules();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function deleteSchedule(id){
+  if(!confirm('Delete this schedule?')) return;
+  try{await api(`/api/v1/clerk/schedules/${id}`,{method:'DELETE'});toast('Deleted.');loadSchedules();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+async function loadLocationsClerk(){
+  setHtml('rm-body',spinner());
+  try{
+    const d=await api('/api/v1/clerk/locations');
+    setHtml('rm-body',`<div class="tbl-wrap"><table>
+      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Wing</th><th>Floor</th><th>Availability</th><th>Actions</th></tr></thead>
+      <tbody>${d.locations.map(l=>`<tr>
+        <td>${l.location_id}</td><td>${l.name}</td><td>${l.category||'–'}</td>
+        <td>${l.wing_name||'–'}</td><td>${l.floor_level??'?'}</td>
+        <td><span class="badge ${l.is_active?'badge-green':'badge-red'}">${l.is_active?'Active':'Inactive'}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="toggleLocation(${l.location_id},${!l.is_active})">${l.is_active?'Deactivate':'Activate'}</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`);
+  }catch(e){setHtml('rm-body',errHtml(e.message));}
+}
+
+async function toggleLocation(id,newState){
+  try{await api(`/api/v1/clerk/locations/${id}`,{method:'PUT',body:JSON.stringify({is_active:newState})});toast('✅ Updated.');loadLocationsClerk();}
+  catch(e){toast('❌ '+e.message);}
+}
+
+/* ══════════════════════════════════════════
+   MODAL helpers
+══════════════════════════════════════════ */
+function openModal(html){
+  let overlay=document.getElementById('modal-overlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='modal-overlay';overlay.className='modal-overlay';document.body.appendChild(overlay);}
+  overlay.innerHTML=`<div class="modal">${html}</div>`;
+  overlay.style.display='flex';
+  return overlay;
+}
+function closeModal(){const o=document.getElementById('modal-overlay');if(o)o.style.display='none';}
 
 /* ══════════════════════════════════════════
    INIT
 ══════════════════════════════════════════ */
-checkHealth();
-loadDashboard();
+if(_token && _user){
+  initApp();
+}else{
+  showScreen('screen-login');
+}
 </script>
 </body>
 </html>

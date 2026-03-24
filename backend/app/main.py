@@ -20,6 +20,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
 from app.routers import navigation, resources, lost_found, faculty
+from app.routers import auth as auth_router
+from app.routers import admin as admin_router
+from app.routers import marks as marks_router
+from app.routers import clerk as clerk_router
 
 
 @asynccontextmanager
@@ -54,6 +58,10 @@ app.include_router(navigation.router)
 app.include_router(resources.router)
 app.include_router(lost_found.router)
 app.include_router(faculty.router)
+app.include_router(auth_router.router)
+app.include_router(admin_router.router)
+app.include_router(marks_router.router)
+app.include_router(clerk_router.router)
 
 
 @app.get("/health", tags=["Health"])
