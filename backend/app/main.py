@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import sys
+
+# Allow `python main.py` to be run directly from the backend/app directory by
+# ensuring the backend root (parent of this file's directory) is on sys.path
+# so that `from app.*` imports resolve correctly.
+if not __package__:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
