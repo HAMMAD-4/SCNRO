@@ -360,3 +360,59 @@ def close_lost_found(
     item.closed_by = current_user.user_id
     db.commit()
     return {"item_id": item.item_id, "status": item.status}
+
+
+# ── Mark Change Requests ─────────────────────────────────────────────────────
+
+@router.post("/mark-change-requests/{request_id}/accept")
+def accept_mark_change_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """Accept a teacher's mark change request and auto-update the mark."""
+    from datetime import datetime, timezone
+
+    from app.models import MarkChangeRequest, MarkRecord
+
+    req = db.query(MarkChangeRequest).filter(
+        MarkChangeRequest.request_id == request_id,
+        MarkChangeRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+
+    record = db.query(MarkRecord).filter(MarkRecord.record_id == req.record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Mark record not found.")
+
+    record.marks_obtained = req.new_marks_obtained
+    if req.new_total_marks is not None:
+        record.total_marks = req.new_total_marks
+    req.status = "accepted"
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Request accepted and marks updated.", "request_id": request_id}
+
+
+@router.post("/mark-change-requests/{request_id}/reject")
+def reject_mark_change_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: User = _admin,
+):
+    """Reject a teacher's mark change request."""
+    from datetime import datetime, timezone
+
+    from app.models import MarkChangeRequest
+
+    req = db.query(MarkChangeRequest).filter(
+        MarkChangeRequest.request_id == request_id,
+        MarkChangeRequest.status == "pending",
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Pending request not found.")
+    req.status = "rejected"
+    req.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Request rejected.", "request_id": request_id}

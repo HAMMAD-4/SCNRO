@@ -150,6 +150,20 @@ def _seed_users(db) -> None:
     db.commit()
 
 
+def _update_admin_password(db) -> None:
+    """Ensure the admin account uses the current required password.
+
+    Called every startup so changing the password in code takes effect even on
+    an existing database without having to drop and recreate it.
+    """
+    from app.auth_utils import hash_password, verify_password
+
+    admin = db.query(User).filter(User.email == "admin@pucit.edu.pk").first()
+    if admin and not verify_password("admin!23", admin.password_hash):
+        admin.password_hash = hash_password("admin!23")
+        db.commit()
+
+
 def init_db() -> None:
     """Create all tables and seed with sample data."""
     Base.metadata.create_all(bind=engine)
@@ -157,6 +171,7 @@ def init_db() -> None:
     try:
         _seed_locations(db)
         _seed_users(db)
+        _update_admin_password(db)
     finally:
         db.close()
 

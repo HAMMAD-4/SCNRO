@@ -397,6 +397,113 @@ def finalize_category(
     return {"message": f"Category '{category}' finalized for course {course_id}."}
 
 
+# ── Mark Change Requests ─────────────────────────────────────────────────────
+
+class MarkChangeRequestCreate(BaseModel):
+    record_id: int
+    new_marks_obtained: float
+    new_total_marks: Optional[float] = None
+    reason: str = Field(..., min_length=5)
+
+
+@router.post("/marks/change-request", status_code=201)
+def create_mark_change_request(
+    payload: MarkChangeRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("teacher")),
+):
+    """Teacher submits a mark amendment request for a finalized category."""
+    from app.models import MarkChangeRequest
+
+    record = db.query(MarkRecord).filter(MarkRecord.record_id == payload.record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Mark record not found.")
+
+    # Verify teacher owns the course
+    course = db.query(Course).filter(Course.course_id == record.course_id).first()
+    if not course or course.teacher_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your course.")
+
+    # Category must be finalized
+    lock = db.query(CategoryLock).filter(
+        CategoryLock.course_id == record.course_id,
+        CategoryLock.category == record.category,
+        CategoryLock.is_locked.is_(True),
+    ).first()
+    if not lock:
+        raise HTTPException(
+            status_code=400,
+            detail="Category is not finalized. Edit the mark directly.",
+        )
+
+    # Reject if a pending request already exists for this record
+    existing = db.query(MarkChangeRequest).filter(
+        MarkChangeRequest.record_id == payload.record_id,
+        MarkChangeRequest.status == "pending",
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="A pending change request already exists for this mark.",
+        )
+
+    req = MarkChangeRequest(
+        teacher_id=current_user.user_id,
+        course_id=record.course_id,
+        student_id=record.student_id,
+        record_id=payload.record_id,
+        category=record.category,
+        new_marks_obtained=payload.new_marks_obtained,
+        new_total_marks=payload.new_total_marks,
+        reason=payload.reason,
+        status="pending",
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return {"message": "Change request submitted.", "request_id": req.request_id}
+
+
+@router.get("/marks/change-requests")
+def list_mark_change_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Teachers see their own requests; admin sees all."""
+    from app.models import MarkChangeRequest
+
+    q = db.query(MarkChangeRequest)
+    if current_user.role == "teacher":
+        q = q.filter(MarkChangeRequest.teacher_id == current_user.user_id)
+    elif current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    requests = q.order_by(MarkChangeRequest.created_at.desc()).all()
+    result = []
+    for r in requests:
+        student = db.query(User).filter(User.user_id == r.student_id).first()
+        teacher = db.query(User).filter(User.user_id == r.teacher_id).first()
+        record = db.query(MarkRecord).filter(MarkRecord.record_id == r.record_id).first()
+        course = db.query(Course).filter(Course.course_id == r.course_id).first()
+        result.append({
+            "request_id": r.request_id,
+            "teacher_name": teacher.name if teacher else "?",
+            "course_code": course.code if course else "?",
+            "course_name": course.name if course else "?",
+            "student_name": student.name if student else "?",
+            "record_title": record.title if record else "?",
+            "category": r.category,
+            "current_marks": float(record.marks_obtained) if record and record.marks_obtained is not None else None,
+            "current_total": float(record.total_marks) if record and record.total_marks is not None else None,
+            "new_marks_obtained": float(r.new_marks_obtained) if r.new_marks_obtained is not None else None,
+            "new_total_marks": float(r.new_total_marks) if r.new_total_marks is not None else None,
+            "reason": r.reason,
+            "status": r.status,
+            "created_at": str(r.created_at),
+        })
+    return {"requests": result}
+
+
 # ── PDF Report ───────────────────────────────────────────────────────────────
 
 @router.get("/courses/{course_id}/report.pdf")

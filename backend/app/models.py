@@ -206,3 +206,33 @@ class CategoryLock(Base):
 
     course = relationship("Course", back_populates="category_locks")
     locker = relationship("User", foreign_keys=[locked_by])
+
+
+class MarkChangeRequest(Base):
+    """Request raised by a teacher to amend a mark in a finalized category.
+
+    Admin must accept the request before marks are updated.
+    """
+
+    __tablename__ = "mark_change_requests"
+
+    request_id = Column(Integer, primary_key=True, autoincrement=True)
+    teacher_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    record_id = Column(Integer, ForeignKey("mark_records.record_id"), nullable=False)
+    category = Column(String(30), nullable=False)
+    new_marks_obtained = Column(DECIMAL(6, 2), nullable=False)
+    new_total_marks = Column(DECIMAL(6, 2))
+    reason = Column(Text, nullable=False)
+    # pending | accepted | rejected
+    status = Column(String(20), default="pending")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    reviewed_by = Column(Integer, ForeignKey("users.user_id"))
+    reviewed_at = Column(TIMESTAMP)
+
+    teacher = relationship("User", foreign_keys=[teacher_id])
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course")
+    record = relationship("MarkRecord")
+    reviewer = relationship("User", foreign_keys=[reviewed_by])

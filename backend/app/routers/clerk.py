@@ -41,6 +41,14 @@ class ScheduleUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class LocationCreate(BaseModel):
+    name: str
+    category: Optional[str] = None
+    wing_name: Optional[str] = None
+    floor_level: Optional[int] = None
+    is_active: bool = True
+
+
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
@@ -230,3 +238,48 @@ def update_location(
 
     db.commit()
     return {"message": "Location updated.", "location_id": location_id}
+
+
+@router.post("/locations", status_code=201)
+def create_location(
+    payload: LocationCreate,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Create a new campus room / location."""
+    loc = Location(
+        name=payload.name,
+        category=payload.category,
+        wing_name=payload.wing_name,
+        floor_level=payload.floor_level,
+        is_active=payload.is_active,
+    )
+    db.add(loc)
+    db.commit()
+    db.refresh(loc)
+    return {
+        "message": "Location created.",
+        "location_id": loc.location_id,
+        "name": loc.name,
+    }
+
+
+@router.delete("/locations/{location_id}")
+def delete_location(
+    location_id: int,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Delete a campus location.
+
+    Schedules referencing this location are also deleted to preserve integrity.
+    """
+    loc = db.query(Location).filter(Location.location_id == location_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found.")
+
+    # Remove schedules referencing this location first
+    db.query(Schedule).filter(Schedule.location_id == location_id).delete()
+    db.delete(loc)
+    db.commit()
+    return {"message": "Location deleted.", "location_id": location_id}
