@@ -22,6 +22,11 @@ router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
 
 
 class ItemReportRequest(BaseModel):
+    """Schema for reporting a lost or found item.
+    
+    Authentication is handled via JWT — the user_id is automatically extracted
+    from the Bearer token. No need to supply user_id in the request body.
+    """
     item_name: str = Field(..., max_length=100)
     description: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=255)

@@ -293,7 +293,7 @@ class CourseRequest(Base):
     name = Column(String(255), nullable=False)
     teacher_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     section = Column(String(20))
-    section_id = Column(Integer, ForeignKey("sections.section_id"))  # for auto-enroll
+    section_id = Column(Integer, ForeignKey("sections.section_id"))  # when set, all students in this section are auto-enrolled on course approval
     semester = Column(String(30))
     # pending | approved | rejected
     status = Column(String(20), default="pending")

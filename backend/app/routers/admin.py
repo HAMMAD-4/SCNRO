@@ -372,8 +372,6 @@ def accept_mark_change_request(
     _: User = _admin,
 ):
     """Accept a teacher's mark change request and auto-update the mark."""
-    from datetime import datetime, timezone
-
     from app.models import MarkChangeRequest, MarkRecord
 
     req = db.query(MarkChangeRequest).filter(
@@ -403,8 +401,6 @@ def reject_mark_change_request(
     _: User = _admin,
 ):
     """Reject a teacher's mark change request."""
-    from datetime import datetime, timezone
-
     from app.models import MarkChangeRequest
 
     req = db.query(MarkChangeRequest).filter(
@@ -514,8 +510,6 @@ def reject_course_request(
     _: User = _admin,
 ):
     """Reject a pending course request."""
-    from datetime import datetime, timezone
-
     from app.models import CourseRequest
 
     req = db.query(CourseRequest).filter(
