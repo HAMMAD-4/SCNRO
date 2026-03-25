@@ -17,7 +17,7 @@ from app.models import SignupRequest, User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
-ALLOWED_SELF_ROLES = {"teacher", "student", "sac", "head_clerk"}
+ALLOWED_SELF_ROLES = {"teacher", "student", "sac", "head_clerk", "degree_coordinator"}
 
 
 # ── Schemas ─────────────────────────────────────────────────────────────────
@@ -124,3 +124,16 @@ def me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role,
     }
+
+
+@router.get("/portal-status")
+def portal_status(db: Session = Depends(get_db)):
+    """Return portal availability status (public)."""
+    from app.models import SystemSetting
+    row = db.query(SystemSetting).filter(SystemSetting.key == "portal_available").first()
+    available = (row.value.lower() != "false") if row else True
+    name_row = db.query(SystemSetting).filter(SystemSetting.key == "portal_name").first()
+    portal_name = name_row.value if name_row else "SCNRO – PUCIT Smart Campus"
+    msg_row = db.query(SystemSetting).filter(SystemSetting.key == "unavailable_message").first()
+    msg = msg_row.value if msg_row else "The portal is currently unavailable."
+    return {"available": available, "portal_name": portal_name, "unavailable_message": msg}

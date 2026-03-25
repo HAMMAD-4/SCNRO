@@ -99,7 +99,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
-    # Roles: admin | teacher | student | sac | head_clerk
+    # Roles: admin | teacher | student | sac | head_clerk | degree_coordinator
     role = Column(String(30), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
@@ -238,6 +238,50 @@ class MarkChangeRequest(Base):
     reviewer = relationship("User", foreign_keys=[reviewed_by])
 
 
+class Section(Base):
+    """An academic section (e.g. CS-6A) with a program and a degree coordinator."""
+
+    __tablename__ = "sections"
+
+    section_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)        # e.g. "CS-6A"
+    program = Column(String(20), nullable=False)      # IT | SE | CS | DS | AI
+    semester = Column(String(30))                     # e.g. "Spring 2025"
+    coordinator_id = Column(Integer, ForeignKey("users.user_id"))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    coordinator = relationship("User", foreign_keys=[coordinator_id])
+    student_sections = relationship("StudentSection", back_populates="section",
+                                    cascade="all, delete-orphan")
+
+
+class StudentSection(Base):
+    """Maps a student to a section (head clerk assigns students to sections)."""
+
+    __tablename__ = "student_sections"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    section_id = Column(Integer, ForeignKey("sections.section_id"), nullable=False)
+    enrolled_at = Column(TIMESTAMP, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("student_id", "section_id"),)
+
+    student = relationship("User", foreign_keys=[student_id])
+    section = relationship("Section", back_populates="student_sections")
+
+
+class SystemSetting(Base):
+    """Key-value store for admin-configurable portal settings."""
+
+    __tablename__ = "system_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+
 class CourseRequest(Base):
     """Request by head_clerk to register a new course (needs admin approval)."""
 
@@ -249,6 +293,7 @@ class CourseRequest(Base):
     name = Column(String(255), nullable=False)
     teacher_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     section = Column(String(20))
+    section_id = Column(Integer, ForeignKey("sections.section_id"))  # for auto-enroll
     semester = Column(String(30))
     # pending | approved | rejected
     status = Column(String(20), default="pending")
@@ -259,6 +304,7 @@ class CourseRequest(Base):
     clerk = relationship("User", foreign_keys=[clerk_id])
     teacher = relationship("User", foreign_keys=[teacher_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+    section_obj = relationship("Section", foreign_keys=[section_id])
 
 
 class EnrollmentRequest(Base):

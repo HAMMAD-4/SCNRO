@@ -212,6 +212,7 @@ tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
         <option value="teacher">Teacher / Lecturer</option>
         <option value="sac">SAC Officer</option>
         <option value="head_clerk">Head Clerk</option>
+        <option value="degree_coordinator">Degree Coordinator</option>
       </select>
       <label for="su-pass">Password</label>
       <input id="su-pass" type="password" placeholder="Min 6 characters" required/>
@@ -289,7 +290,8 @@ function closeModal() { $id('modal-overlay').style.display = 'none'; }
 $id('modal-overlay').addEventListener('click', e => { if(e.target === $id('modal-overlay')) closeModal(); });
 
 function fmtRole(r) {
-  return {admin:'Admin',teacher:'Teacher',student:'Student',sac:'SAC Officer',head_clerk:'Head Clerk'}[r]||r;
+  return {admin:'Admin',teacher:'Teacher',student:'Student',sac:'SAC Officer',
+    head_clerk:'Head Clerk',degree_coordinator:'Degree Coordinator'}[r]||r;
 }
 function badge(txt, cls) { return `<span class="badge ${cls}">${txt}</span>`; }
 
@@ -361,11 +363,12 @@ const NAV_ALL = [
   {id:'free_rooms', ico:'🚪', lbl:'Free Rooms'},
   {id:'navigate',   ico:'🗺', lbl:'Navigate'},
   {id:'lostfound',  ico:'🔍', lbl:'Lost & Found'},
-  {id:'faculty',    ico:'👥', lbl:'Faculty',    roles:['admin']},
-  {id:'admin_panel',ico:'⚙',  lbl:'Admin Panel', roles:['admin']},
-  {id:'marks_mgmt', ico:'��', lbl:'Marks Mgmt',  roles:['teacher','admin']},
-  {id:'my_grades',  ico:'🎓', lbl:'My Grades',   roles:['student']},
-  {id:'room_mgmt',  ico:'🏢', lbl:'Room Mgmt',   roles:['head_clerk','admin']},
+  {id:'faculty',    ico:'👥', lbl:'Faculty',         roles:['admin','degree_coordinator']},
+  {id:'admin_panel',ico:'⚙',  lbl:'Admin Panel',     roles:['admin']},
+  {id:'marks_mgmt', ico:'📊', lbl:'Marks Mgmt',      roles:['teacher','admin']},
+  {id:'my_grades',  ico:'🎓', lbl:'My Grades',        roles:['student']},
+  {id:'room_mgmt',  ico:'🏢', lbl:'Room Mgmt',        roles:['head_clerk','admin']},
+  {id:'dc_panel',   ico:'🎯', lbl:'My Section',       roles:['degree_coordinator']},
 ];
 
 let _currentPane = '';
@@ -418,24 +421,47 @@ const PANES = {};
 
 /* ── Dashboard ──────────────────────────────────────────────────────── */
 PANES.dashboard = async mc => {
-  mc.innerHTML = `<h2>�� Dashboard</h2>
+  mc.innerHTML = `<h2>🏠 Dashboard</h2>
   <div class="stat-grid" id="dash-stats"><div class="stat-card"><div class="spinner"></div></div></div>
   <div class="card"><div class="card-title">📢 Welcome to SCNRO</div>
     <p style="font-size:.9rem;color:var(--muted)">Smart Campus Navigation &amp; Resource Optimizer for Punjab University College of Information Technology.</p>
-  </div>`;
+  </div>
+  <div id="dash-extra"></div>`;
   try {
-    const [locs, items] = await Promise.all([
-      apiFetch('/resources/locations').then(r=>r.json()),
-      apiFetch('/items').then(r=>r.json()),
-    ]);
-    const active   = (locs.locations||[]).filter(l=>l.is_active).length;
-    const inactive = (locs.locations||[]).length - active;
-    const open     = (items.items||[]).filter(i=>i.status!=='Closed').length;
-    $id('dash-stats').innerHTML = `
-      <div class="stat-card"><div class="val">${(locs.locations||[]).length}</div><div class="lbl">Total Rooms</div></div>
-      <div class="stat-card"><div class="val" style="color:#22c55e">${active}</div><div class="lbl">Available</div></div>
-      <div class="stat-card"><div class="val" style="color:#ef4444">${inactive}</div><div class="lbl">Unavailable</div></div>
-      <div class="stat-card"><div class="val" style="color:#f59e0b">${open}</div><div class="lbl">Open Reports</div></div>`;
+    if (_user.role === 'admin') {
+      const r = await apiFetch('/admin/dashboard-stats');
+      if (!r || !r.ok) throw new Error();
+      const d = await r.json();
+      $id('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="val">${d.users.total}</div><div class="lbl">Total Users</div></div>
+        <div class="stat-card"><div class="val" style="color:#1d4ed8">${d.users.students}</div><div class="lbl">Students</div></div>
+        <div class="stat-card"><div class="val" style="color:#6d28d9">${d.users.teachers}</div><div class="lbl">Teachers</div></div>
+        <div class="stat-card"><div class="val" style="color:#0891b2">${d.users.clerical}</div><div class="lbl">Clerical Staff</div></div>
+        <div class="stat-card"><div class="val" style="color:#d97706">${d.users.degree_coordinators}</div><div class="lbl">Degree Coords</div></div>
+        <div class="stat-card"><div class="val">${d.rooms.total}</div><div class="lbl">Total Rooms</div></div>
+        <div class="stat-card"><div class="val" style="color:#22c55e">${d.rooms.active}</div><div class="lbl">Active Rooms</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_courses}</div><div class="lbl">Active Courses</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_sections}</div><div class="lbl">Sections</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_enrollments}</div><div class="lbl">Enrollments</div></div>
+        <div class="stat-card"><div class="val" style="color:#f59e0b">${d.lost_found.open}</div><div class="lbl">L&F Open</div></div>
+        <div class="stat-card"><div class="val" style="color:#6b7280">${d.lost_found.closed}</div><div class="lbl">L&F Closed</div></div>`;
+      const p = d.pending_requests;
+      $id('dash-extra').innerHTML = `
+        <div class="card"><div class="card-title">⏳ Pending Requests</div>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="val" style="color:#ef4444">${p.signups}</div><div class="lbl">Signup Requests</div></div>
+            <div class="stat-card"><div class="val" style="color:#f59e0b">${p.course_requests}</div><div class="lbl">Course Requests</div></div>
+            <div class="stat-card"><div class="val" style="color:#3b82f6">${p.enrollment_requests}</div><div class="lbl">Enrollment Req.</div></div>
+            <div class="stat-card"><div class="val" style="color:#8b5cf6">${p.mark_change_requests}</div><div class="lbl">Mark Changes</div></div>
+          </div>
+          ${p.total ? `<p class="alert alert-warn" style="margin-top:.5rem">⚠️ ${p.total} request(s) awaiting your attention.</p>` : '<p class="alert alert-success">✓ No pending requests.</p>'}
+        </div>`;
+    } else {
+      const items = await apiFetch('/items').then(r=>r && r.json()).catch(()=>({items:[]}));
+      const open = (items&&items.items||[]).filter(i=>i.status!=='Closed').length;
+      $id('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="val" style="color:#f59e0b">${open}</div><div class="lbl">Open L&F Reports</div></div>`;
+    }
   } catch(e) { $id('dash-stats').innerHTML='<p class="alert alert-warn">Could not load stats.</p>'; }
 };
 
@@ -573,94 +599,65 @@ async function closeLFItem(id) {
   loadLFList();
 }
 
-/* ── Faculty (Admin only) ───────────────────────────────────────────── */
+/* ── Faculty (Admin + DC view) ──────────────────────────────────────── */
 PANES.faculty = async mc => {
   mc.innerHTML = `<h2>👥 Faculty Directory</h2>
-  <div class="card" id="fac-list-wrap"><span class="spinner"></span></div>
-  <div class="card">
-    <div class="card-title">➕ Add Faculty Member</div>
-    <div class="form-row">
-      <div class="form-field"><label>Name</label><input id="fac-name" placeholder="Dr. Example"/></div>
-      <div class="form-field"><label>Designation</label><input id="fac-desig" placeholder="Professor"/></div>
-      <div class="form-field"><label>Department</label><input id="fac-dept" placeholder="CS"/></div>
-      <div class="form-field"><label>Office Location ID</label><input id="fac-loc" type="number"/></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-primary btn-sm" onclick="addFaculty()">Add</button>
-    </div>
-    <div id="fac-msg"></div>
-  </div>`;
-  loadFacultyList();
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="facTab(this,'fac-teachers')">Teachers</button>
+    <button class="tab-btn" onclick="facTab(this,'fac-clerical')">Clerical Staff</button>
+  </div>
+  <div id="fac-teachers"></div>
+  <div id="fac-clerical" style="display:none"></div>`;
+  loadFacTeachers();
 };
-async function loadFacultyList() {
-  const r = await apiFetch('/faculty');
-  const d = await r.json();
-  const list = d.faculty||[];
-  $id('fac-list-wrap').innerHTML = `<div class="card-title">Faculty (${list.length})</div>
-  <div class="tbl-wrap"><table>
-    <thead><tr><th>ID</th><th>Name</th><th>Designation</th><th>Dept</th><th>Available</th><th>Actions</th></tr></thead>
-    <tbody>${list.map(f=>`<tr>
-      <td>${f.faculty_id}</td><td>${f.name}</td>
-      <td>${f.designation||'—'}</td><td>${f.department||'—'}</td>
-      <td>${badge(f.is_available?'Yes':'No',f.is_available?'badge-green':'badge-red')}</td>
-      <td>
-        <button class="btn btn-sm btn-ghost" onclick="editFacultyModal(${f.faculty_id},'${escHtml(f.name)}','${escHtml(f.designation||'')}','${escHtml(f.department||'')}',${f.office_location_id||'null'},${f.is_available})">Edit</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteFaculty(${f.faculty_id})">Del</button>
-      </td>
-    </tr>`).join('')}</tbody></table></div>`;
+function facTab(btn, pane) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['fac-teachers','fac-clerical'].forEach(id=>$id(id).style.display='none');
+  $id(pane).style.display='';
+  if (pane==='fac-teachers' && !$id('fac-teachers').innerHTML) loadFacTeachers();
+  if (pane==='fac-clerical' && !$id('fac-clerical').innerHTML) loadFacClerical();
+}
+async function loadFacTeachers() {
+  $id('fac-teachers').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/staff?role=teacher');
+  const d=await r.json();
+  const users=(d.staff||[]).filter(u=>u.role==='teacher');
+  // Also get faculty records for department info
+  const fr=await apiFetch('/faculty');
+  const fd=await fr.json();
+  const facMap={};
+  (fd.faculty||[]).forEach(f=>{ facMap[f.name]={dept:f.department,desig:f.designation,avail:f.is_available}; });
+  $id('fac-teachers').innerHTML=`<div class="card"><div class="card-title">Teachers (${users.length})</div>
+  ${users.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Designation</th><th>Status</th></tr></thead>
+    <tbody>${users.map(u=>{
+      const fi=facMap[u.name]||{};
+      return `<tr>
+        <td>${u.name}</td><td>${u.email}</td>
+        <td>${fi.dept||'—'}</td><td>${fi.desig||'—'}</td>
+        <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`
+    :'<p style="color:var(--muted)">No teachers found.</p>'}</div>`;
+}
+async function loadFacClerical() {
+  $id('fac-clerical').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/staff');
+  const d=await r.json();
+  const users=(d.staff||[]).filter(u=>['head_clerk','sac','degree_coordinator'].includes(u.role));
+  $id('fac-clerical').innerHTML=`<div class="card"><div class="card-title">Clerical & Administrative Staff (${users.length})</div>
+  ${users.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${u.name}</td><td>${u.email}</td>
+      <td>${badge(fmtRole(u.role),'badge-blue')}</td>
+      <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
+    </tr>`).join('')}</tbody></table></div>`
+    :'<p style="color:var(--muted)">No clerical staff found.</p>'}</div>`;
 }
 function escHtml(s){
-  return (s||'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#x27;');
-}
-async function addFaculty() {
-  const payload = {
-    name:f($id('fac-name').value),designation:f($id('fac-desig').value),
-    department:f($id('fac-dept').value),office_location_id:$id('fac-loc').value?parseInt($id('fac-loc').value):null
-  };
-  function f(v){return v.trim()||null;}
-  if (!payload.name){$id('fac-msg').innerHTML='<div class="alert alert-warn">Name required.</div>';return;}
-  const r=await apiFetch('/admin/faculty',{method:'POST',body:JSON.stringify(payload)});
-  const d=await r.json();
-  if(!r.ok){$id('fac-msg').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`;return;}
-  $id('fac-msg').innerHTML='<div class="alert alert-success">✓ Added.</div>';
-  ['fac-name','fac-desig','fac-dept','fac-loc'].forEach(i=>$id(i).value='');
-  loadFacultyList();
-}
-function editFacultyModal(id,name,desig,dept,locId,avail){
-  openModal('Edit Faculty', `
-    <div class="form-field"><label>Name</label><input id="ef-name" value="${escHtml(name)}"/></div>
-    <div class="form-field"><label>Designation</label><input id="ef-desig" value="${escHtml(desig)}"/></div>
-    <div class="form-field"><label>Department</label><input id="ef-dept" value="${escHtml(dept)}"/></div>
-    <div class="form-field"><label>Office Location ID</label><input id="ef-loc" type="number" value="${locId||''}"/></div>
-    <div class="form-field"><label>Available</label>
-      <select id="ef-avail"><option value="true" ${avail?'selected':''}>Yes</option><option value="false" ${!avail?'selected':''}>No</option></select>
-    </div>`,
-    `<button class="btn btn-primary btn-sm" onclick="saveFaculty(${id})">Save</button>
-     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
-  );
-}
-async function saveFaculty(id){
-  const payload={
-    name:$id('ef-name').value.trim()||undefined,
-    designation:$id('ef-desig').value.trim()||undefined,
-    department:$id('ef-dept').value.trim()||undefined,
-    office_location_id:$id('ef-loc').value?parseInt($id('ef-loc').value):undefined,
-    is_available:$id('ef-avail').value==='true'
-  };
-  const r=await apiFetch(`/admin/faculty/${id}`,{method:'PUT',body:JSON.stringify(payload)});
-  if(!r.ok){alert((await r.json()).detail);return;}
-  closeModal(); loadFacultyList();
-}
-async function deleteFaculty(id){
-  if(!confirm('Delete this faculty member?'))return;
-  const r=await apiFetch(`/admin/faculty/${id}`,{method:'DELETE'});
-  if(!r.ok){alert((await r.json()).detail);return;}
-  loadFacultyList();
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 
 /* ── Admin Panel ────────────────────────────────────────────────────── */
@@ -672,24 +669,27 @@ PANES.admin_panel = async mc => {
     <button class="tab-btn" onclick="apTab(this,'ap-mcr')">Mark Change Requests</button>
     <button class="tab-btn" onclick="apTab(this,'ap-course-req')">Course Requests</button>
     <button class="tab-btn" onclick="apTab(this,'ap-enroll-req')">Enrollment Requests</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-settings')">⚙ Settings</button>
   </div>
   <div id="ap-signups"></div>
   <div id="ap-staff"      style="display:none"></div>
   <div id="ap-mcr"        style="display:none"></div>
   <div id="ap-course-req" style="display:none"></div>
-  <div id="ap-enroll-req" style="display:none"></div>`;
+  <div id="ap-enroll-req" style="display:none"></div>
+  <div id="ap-settings"   style="display:none"></div>`;
   loadSignupRequests();
 };
 function apTab(btn, pane) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['ap-signups','ap-staff','ap-mcr','ap-course-req','ap-enroll-req'].forEach(id=>$id(id).style.display='none');
+  ['ap-signups','ap-staff','ap-mcr','ap-course-req','ap-enroll-req','ap-settings'].forEach(id=>$id(id).style.display='none');
   $id(pane).style.display='';
   if (pane==='ap-signups'    && !$id('ap-signups').innerHTML)    loadSignupRequests();
   if (pane==='ap-staff'      && !$id('ap-staff').innerHTML)      loadStaffMgmt();
   if (pane==='ap-mcr'        && !$id('ap-mcr').innerHTML)        loadMarkChangeRequests();
   if (pane==='ap-course-req' && !$id('ap-course-req').innerHTML) loadAdminCourseRequests();
   if (pane==='ap-enroll-req' && !$id('ap-enroll-req').innerHTML) loadAdminEnrollRequests();
+  if (pane==='ap-settings')                                       loadAdminSettings();
   // always reload MCR when switching to it
   if (pane==='ap-mcr') loadMarkChangeRequests();
 }
@@ -699,9 +699,17 @@ async function loadSignupRequests() {
   const d=await r.json();
   const reqs=(d.requests||[]).filter(r=>r.status==='pending');
   $id('ap-signups').innerHTML = `<div class="card"><div class="card-title">Pending Requests (${reqs.length})</div>
-  ${reqs.length?`<div class="tbl-wrap"><table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Date</th><th>Actions</th></tr></thead>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('su-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('su-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveSignups()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectSignups()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" id="su-chk-all" onchange="toggleAll('su-chk',this)"/></th><th>Name</th><th>Email</th><th>Role</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="su-chk" value="${q.request_id}"/></td>
       <td>${q.name}</td><td>${q.email}</td><td>${badge(fmtRole(q.role_requested),'badge-blue')}</td>
       <td>${new Date(q.created_at).toLocaleDateString()}</td>
       <td>
@@ -717,6 +725,23 @@ async function approveSignup(id){
 async function rejectSignup(id){
   if(!confirm('Reject this request?'))return;
   const r=await apiFetch(`/admin/signup-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+function toggleAll(cls, cb) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=cb.checked); }
+function bulkSelectAll(cls) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=true); }
+function bulkDeselectAll(cls) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=false); }
+function getChecked(cls) { return [...document.querySelectorAll('.'+cls+':checked')].map(c=>parseInt(c.value)); }
+async function bulkApproveSignups(){
+  const ids=getChecked('su-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/signup-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+async function bulkRejectSignups(){
+  const ids=getChecked('su-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} requests?`))return;
+  const r=await apiFetch('/admin/signup-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
   if(!r.ok){alert((await r.json()).detail);return;}
   loadSignupRequests();
 }
@@ -745,8 +770,12 @@ function openAddStaffModal(){
     <div class="form-field"><label>Email</label><input id="as-email" type="email"/></div>
     <div class="form-field"><label>Password</label><input id="as-pass" type="password"/></div>
     <div class="form-field"><label>Role</label>
-      <select id="as-role"><option value="student">Student</option><option value="teacher">Teacher</option>
-      <option value="sac">SAC Officer</option><option value="head_clerk">Head Clerk</option><option value="admin">Admin</option></select>
+      <select id="as-role">
+        <option value="student">Student</option><option value="teacher">Teacher</option>
+        <option value="sac">SAC Officer</option><option value="head_clerk">Head Clerk</option>
+        <option value="degree_coordinator">Degree Coordinator</option>
+        <option value="admin">Admin</option>
+      </select>
     </div>`,
     `<button class="btn btn-primary btn-sm" onclick="addStaff()">Add</button>
      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
@@ -771,6 +800,7 @@ function openEditStaffModal(id,name,email,role,active){
         <option value="teacher" ${role==='teacher'?'selected':''}>Teacher</option>
         <option value="sac"     ${role==='sac'?'selected':''}>SAC Officer</option>
         <option value="head_clerk" ${role==='head_clerk'?'selected':''}>Head Clerk</option>
+        <option value="degree_coordinator" ${role==='degree_coordinator'?'selected':''}>Degree Coordinator</option>
         <option value="admin"  ${role==='admin'?'selected':''}>Admin</option>
       </select>
     </div>
@@ -844,9 +874,17 @@ async function loadAdminCourseRequests(){
   const d=await r.json();
   const reqs=(d.requests||[]).filter(q=>q.status==='pending');
   $id('ap-course-req').innerHTML=`<div class="card"><div class="card-title">Pending Course Requests (${reqs.length})</div>
-  ${reqs.length?`<div class="tbl-wrap"><table>
-    <thead><tr><th>Code</th><th>Name</th><th>Teacher</th><th>Section</th><th>Semester</th><th>Submitted By</th><th>Date</th><th>Actions</th></tr></thead>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('cr-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('cr-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveCourseReqs()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectCourseReqs()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('cr-chk',this)"/></th><th>Code</th><th>Name</th><th>Teacher</th><th>Section</th><th>Semester</th><th>By</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="cr-chk" value="${q.request_id}"/></td>
       <td>${q.code}</td><td>${q.name}</td><td>${q.teacher_name}</td>
       <td>${q.section||'–'}</td><td>${q.semester||'–'}</td><td>${q.clerk_name}</td>
       <td>${new Date(q.created_at).toLocaleDateString()}</td>
@@ -867,15 +905,36 @@ async function rejectCourseReq(id){
   if(!r.ok){alert((await r.json()).detail);return;}
   loadAdminCourseRequests();
 }
+async function bulkApproveCourseReqs(){
+  const ids=getChecked('cr-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/course-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
+async function bulkRejectCourseReqs(){
+  const ids=getChecked('cr-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} course requests?`))return;
+  const r=await apiFetch('/admin/course-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
 async function loadAdminEnrollRequests(){
   $id('ap-enroll-req').innerHTML='<span class="spinner"></span>';
   const r=await apiFetch('/admin/enrollment-requests');
   const d=await r.json();
   const reqs=(d.requests||[]).filter(q=>q.status==='pending');
   $id('ap-enroll-req').innerHTML=`<div class="card"><div class="card-title">Pending Enrollment Requests (${reqs.length})</div>
-  ${reqs.length?`<div class="tbl-wrap"><table>
-    <thead><tr><th>Student</th><th>Email</th><th>Course</th><th>Teacher</th><th>Date</th><th>Actions</th></tr></thead>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('er-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('er-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveEnrollReqs()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectEnrollReqs()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('er-chk',this)"/></th><th>Student</th><th>Email</th><th>Course</th><th>Teacher</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="er-chk" value="${q.request_id}"/></td>
       <td>${q.student_name}</td><td>${q.student_email}</td>
       <td>${q.course_code} — ${q.course_name}</td><td>${q.teacher_name}</td>
       <td>${new Date(q.created_at).toLocaleDateString()}</td>
@@ -895,6 +954,81 @@ async function rejectEnrollReq(id){
   const r=await apiFetch(`/admin/enrollment-requests/${id}/reject`,{method:'POST'});
   if(!r.ok){alert((await r.json()).detail);return;}
   loadAdminEnrollRequests();
+}
+async function bulkApproveEnrollReqs(){
+  const ids=getChecked('er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/enrollment-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+async function bulkRejectEnrollReqs(){
+  const ids=getChecked('er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} enrollment requests?`))return;
+  const r=await apiFetch('/admin/enrollment-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+
+/* ── Admin Settings ──────────────────────────────────────────────────── */
+async function loadAdminSettings() {
+  $id('ap-settings').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/settings');
+  const d=await r.json();
+  const s=d.settings||{};
+  $id('ap-settings').innerHTML=`
+  <div class="card">
+    <div class="card-title">⚙ Portal Settings</div>
+    <div class="form-row">
+      <div class="form-field"><label>Portal Name</label><input id="set-name" value="${escHtml(s.portal_name||'')}"/></div>
+      <div class="form-field"><label>Theme</label>
+        <select id="set-theme">
+          <option value="green" ${s.theme==='green'?'selected':''}>Green (PUCIT)</option>
+          <option value="blue"  ${s.theme==='blue'?'selected':''}>Blue</option>
+          <option value="dark"  ${s.theme==='dark'?'selected':''}>Dark</option>
+        </select>
+      </div>
+      <div class="form-field"><label>Portal Availability</label>
+        <select id="set-avail">
+          <option value="true"  ${s.portal_available!=='false'?'selected':''}>Available</option>
+          <option value="false" ${s.portal_available==='false'?'selected':''}>Unavailable (Maintenance)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-field"><label>Unavailable Message</label>
+      <textarea id="set-msg" rows="2">${escHtml(s.unavailable_message||'')}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <div id="set-msg-res"></div>
+  </div>
+  <div class="card" style="border-top:3px solid var(--danger)">
+    <div class="card-title" style="color:var(--danger)">🗑 Danger Zone</div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:.8rem">Erase all application data (rooms, users, courses, sections, lost & found). Admin accounts are preserved.</p>
+    <button class="btn btn-danger btn-sm" onclick="resetAllData()">🗑 Erase All Data</button>
+  </div>`;
+}
+async function saveSettings(){
+  const settings={
+    portal_name:$id('set-name').value.trim(),
+    theme:$id('set-theme').value,
+    portal_available:$id('set-avail').value,
+    unavailable_message:$id('set-msg').value.trim(),
+  };
+  const r=await apiFetch('/admin/settings',{method:'PUT',body:JSON.stringify({settings})});
+  const d=await r.json();
+  if(!r.ok){$id('set-msg-res').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`;return;}
+  $id('set-msg-res').innerHTML='<div class="alert alert-success">✓ Settings saved.</div>';
+}
+async function resetAllData(){
+  if(!confirm('⚠️ This will DELETE ALL data. Admin accounts will be preserved. Type "RESET" to confirm.'))return;
+  const c=prompt('Type RESET to confirm:');
+  if(c!=='RESET')return;
+  const r=await apiFetch('/admin/reset-data',{method:'POST'});
+  const d=await r.json();
+  if(!r.ok){alert(d.detail);return;}
+  alert('✓ All data erased.');
+  loadAdminSettings();
 }
 
 /* ── Marks Management (Teacher & Admin) ─────────────────────────────── */
@@ -1178,21 +1312,24 @@ PANES.room_mgmt = async mc => {
     <button class="tab-btn active" onclick="rmTab(this,'rm-rooms')">Rooms</button>
     <button class="tab-btn" onclick="rmTab(this,'rm-schedules')">Schedules</button>
     <button class="tab-btn" onclick="rmTab(this,'rm-course-req')">Course Requests</button>
+    <button class="tab-btn" onclick="rmTab(this,'rm-sections')">Sections</button>
   </div>
   <div id="rm-rooms"></div>
   <div id="rm-schedules"  style="display:none"></div>
-  <div id="rm-course-req" style="display:none"></div>`;
+  <div id="rm-course-req" style="display:none"></div>
+  <div id="rm-sections"   style="display:none"></div>`;
   loadRooms();
 };
 function rmTab(btn,pane){
   document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['rm-rooms','rm-schedules','rm-course-req'].forEach(id=>$id(id).style.display='none');
+  ['rm-rooms','rm-schedules','rm-course-req','rm-sections'].forEach(id=>$id(id).style.display='none');
   $id(pane).style.display='';
   if(pane==='rm-rooms'      && !$id('rm-rooms').innerHTML)      loadRooms();
   if(pane==='rm-schedules'  && !$id('rm-schedules').innerHTML)  loadSchedules();
   if(pane==='rm-schedules') loadSchedules();
   if(pane==='rm-course-req') loadClerkCourseRequests();
+  if(pane==='rm-sections')   loadSections();
 }
 async function loadRooms(){
   const el=$id('rm-rooms');
@@ -1416,32 +1553,335 @@ async function loadClerkCourseRequests(){
   </div>`;
 }
 async function openCourseReqModal(){
-  const teachersR=await apiFetch('/admin/staff').then(r=>r.json());
+  const [teachersR, sectionsR] = await Promise.all([
+    apiFetch('/admin/staff').then(r=>r.json()),
+    apiFetch('/clerk/sections').then(r=>r.json()).catch(()=>({sections:[]})),
+  ]);
   const teachers=(teachersR.staff||[]).filter(u=>u.role==='teacher'&&u.is_active);
+  const sections=sectionsR.sections||[];
   openModal('Register Course (Request Admin Approval)',`
     <div class="form-field"><label>Course Code *</label><input id="cr-code" placeholder="e.g. CS-401"/></div>
     <div class="form-field"><label>Course Name *</label><input id="cr-name" placeholder="e.g. Algorithms"/></div>
     <div class="form-field"><label>Assign Teacher *</label>
       <select id="cr-teacher">${teachers.map(t=>`<option value="${t.user_id}">${t.name}</option>`).join('')}</select>
     </div>
-    <div class="form-field"><label>Section</label><input id="cr-section" placeholder="A"/></div>
+    <div class="form-field"><label>Section (select from list or type)</label>
+      <select id="cr-section-id">
+        <option value="">— No section (manual) —</option>
+        ${sections.map(s=>`<option value="${s.section_id}">${s.name} (${s.program})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-field"><label>Section Name (manual, if no section selected)</label><input id="cr-section" placeholder="A"/></div>
     <div class="form-field"><label>Semester</label><input id="cr-semester" placeholder="Spring 2025"/></div>`,
     `<button class="btn btn-primary btn-sm" onclick="submitCourseReq()">Submit Request</button>
      <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
   );
 }
 async function submitCourseReq(){
+  const secId=$id('cr-section-id').value;
   const payload={
     code:$id('cr-code').value.trim(),
     name:$id('cr-name').value.trim(),
     teacher_id:parseInt($id('cr-teacher').value),
     section:$id('cr-section').value.trim()||undefined,
+    section_id:secId?parseInt(secId):undefined,
     semester:$id('cr-semester').value.trim()||undefined,
   };
   if(!payload.code||!payload.name||!payload.teacher_id){alert('Code, Name and Teacher are required.');return;}
   const r=await apiFetch('/clerk/course-requests',{method:'POST',body:JSON.stringify(payload)});
   if(!r.ok){alert((await r.json()).detail);return;}
   closeModal(); loadClerkCourseRequests();
+}
+
+/* ── Section Management (Head Clerk) ─────────────────────────────────── */
+async function loadSections() {
+  const el=$id('rm-sections');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/sections');
+  const d=await r.json();
+  const secs=d.sections||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Sections (${secs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddSectionModal()">➕ Add Section</button>
+    </div>
+    ${secs.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Name</th><th>Program</th><th>Semester</th><th>Coordinator</th><th>Students</th><th>Actions</th></tr></thead>
+      <tbody>${secs.map(s=>`<tr>
+        <td>${s.name}</td><td>${badge(s.program,'badge-blue')}</td>
+        <td>${s.semester||'—'}</td><td>${s.coordinator_name||'—'}</td>
+        <td>${s.student_count}</td>
+        <td>
+          <button class="btn btn-sm btn-ghost" onclick="openManageSectionStudents(${s.section_id},'${escHtml(s.name)}')">Students</button>
+          <button class="btn btn-sm btn-ghost" onclick="openEditSectionModal(${s.section_id},'${escHtml(s.name)}','${s.program}','${escHtml(s.semester||'')}',${s.coordinator_id||'null'})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteSection(${s.section_id})">Del</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>`
+    :'<p style="color:var(--muted)">No sections yet.</p>'}
+  </div>`;
+}
+async function openAddSectionModal(){
+  const dcs=await apiFetch('/admin/staff').then(r=>r.json()).then(d=>(d.staff||[]).filter(u=>u.role==='degree_coordinator'&&u.is_active));
+  openModal('Add Section',`
+    <div class="form-field"><label>Section Name *</label><input id="sec-name" placeholder="e.g. CS-6A"/></div>
+    <div class="form-field"><label>Program *</label>
+      <select id="sec-prog"><option value="CS">CS</option><option value="SE">SE</option><option value="IT">IT</option><option value="DS">DS</option><option value="AI">AI</option></select>
+    </div>
+    <div class="form-field"><label>Semester</label><input id="sec-sem" placeholder="Spring 2025"/></div>
+    <div class="form-field"><label>Degree Coordinator</label>
+      <select id="sec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}">${u.name}</option>`).join('')}</select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addSection()">Add</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function addSection(){
+  const payload={
+    name:$id('sec-name').value.trim(),
+    program:$id('sec-prog').value,
+    semester:$id('sec-sem').value.trim()||undefined,
+    coordinator_id:$id('sec-coord').value?parseInt($id('sec-coord').value):undefined,
+  };
+  if(!payload.name){alert('Section name required.');return;}
+  const r=await apiFetch('/clerk/sections',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadSections();
+}
+async function openEditSectionModal(id,name,prog,sem,coordId){
+  const dcs=await apiFetch('/admin/staff').then(r=>r.json()).then(d=>(d.staff||[]).filter(u=>u.role==='degree_coordinator'&&u.is_active));
+  openModal('Edit Section',`
+    <div class="form-field"><label>Section Name</label><input id="esec-name" value="${escHtml(name)}"/></div>
+    <div class="form-field"><label>Program</label>
+      <select id="esec-prog"><option value="CS" ${prog==='CS'?'selected':''}>CS</option><option value="SE" ${prog==='SE'?'selected':''}>SE</option><option value="IT" ${prog==='IT'?'selected':''}>IT</option><option value="DS" ${prog==='DS'?'selected':''}>DS</option><option value="AI" ${prog==='AI'?'selected':''}>AI</option></select>
+    </div>
+    <div class="form-field"><label>Semester</label><input id="esec-sem" value="${escHtml(sem)}"/></div>
+    <div class="form-field"><label>Degree Coordinator</label>
+      <select id="esec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}" ${u.user_id==coordId?'selected':''}>${u.name}</option>`).join('')}</select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="saveSection(${id})">Save</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function saveSection(id){
+  const payload={
+    name:$id('esec-name').value.trim()||undefined,
+    program:$id('esec-prog').value,
+    semester:$id('esec-sem').value.trim()||undefined,
+    coordinator_id:$id('esec-coord').value?parseInt($id('esec-coord').value):undefined,
+  };
+  const r=await apiFetch(`/clerk/sections/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadSections();
+}
+async function deleteSection(id){
+  if(!confirm('Delete this section and all student memberships?'))return;
+  const r=await apiFetch(`/clerk/sections/${id}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSections();
+}
+async function openManageSectionStudents(sectionId, sectionName){
+  const r=await apiFetch(`/clerk/sections/${sectionId}/students`);
+  const d=await r.json();
+  const students=d.students||[];
+  const allStudentsR=await apiFetch('/admin/staff?role=student').then(r=>r.json());
+  const allStudents=(allStudentsR.staff||[]).filter(u=>u.role==='student'&&u.is_active);
+  const enrolledIds=new Set(students.map(s=>s.student_id));
+  openModal(`Students in ${sectionName}`,`
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">Enrolled: ${students.length}</p>
+    ${students.length?`<div class="tbl-wrap" style="max-height:200px;overflow-y:auto"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Action</th></tr></thead>
+      <tbody>${students.map(s=>`<tr><td>${s.name}</td><td>${s.email}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="removeFromSection(${sectionId},${s.student_id})">Remove</button></td>
+      </tr>`).join('')}</tbody></table></div>`:''
+    }
+    <hr style="margin:.8rem 0"/>
+    <div class="form-field"><label>Add Student</label>
+      <select id="sec-add-stud">
+        <option value="">— Select student —</option>
+        ${allStudents.filter(u=>!enrolledIds.has(u.user_id)).map(u=>`<option value="${u.user_id}">${u.name} (${u.email})</option>`).join('')}
+      </select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addToSection(${sectionId})">Add Student</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>`
+  );
+}
+async function addToSection(sectionId){
+  const sid=parseInt($id('sec-add-stud').value);
+  if(!sid){alert('Select a student.');return;}
+  const r=await apiFetch(`/clerk/sections/${sectionId}/students`,{method:'POST',body:JSON.stringify({student_id:sid})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  const sec=$id('rm-sections');
+  // Re-open the modal with fresh data
+  closeModal();
+  const locR=await apiFetch('/clerk/sections').then(r=>r.json());
+  const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
+  if(s) openManageSectionStudents(sectionId,s.name);
+  loadSections();
+}
+async function removeFromSection(sectionId,studentId){
+  if(!confirm('Remove student from section?'))return;
+  const r=await apiFetch(`/clerk/sections/${sectionId}/students/${studentId}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  const locR=await apiFetch('/clerk/sections').then(r=>r.json());
+  const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
+  closeModal();
+  if(s) openManageSectionStudents(sectionId,s.name);
+  loadSections();
+}
+
+/* ── Degree Coordinator Panel ────────────────────────────────────────── */
+PANES.dc_panel = async mc => {
+  mc.innerHTML=`<h2>🎯 My Section</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="dcTab(this,'dc-overview')">Overview</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-students')">Students</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-schedule')">Schedule</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-teachers')">Teachers</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-enroll')">Enrollment Requests</button>
+  </div>
+  <div id="dc-overview"></div>
+  <div id="dc-students"  style="display:none"></div>
+  <div id="dc-schedule"  style="display:none"></div>
+  <div id="dc-teachers"  style="display:none"></div>
+  <div id="dc-enroll"    style="display:none"></div>`;
+  loadDCOverview();
+};
+function dcTab(btn,pane){
+  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['dc-overview','dc-students','dc-schedule','dc-teachers','dc-enroll'].forEach(id=>$id(id).style.display='none');
+  $id(pane).style.display='';
+  if(pane==='dc-overview') loadDCOverview();
+  if(pane==='dc-students') loadDCStudents();
+  if(pane==='dc-schedule') loadDCSchedule();
+  if(pane==='dc-teachers') loadDCTeachers();
+  if(pane==='dc-enroll')   loadDCEnrollRequests();
+}
+async function loadDCOverview(){
+  $id('dc-overview').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/my-section');
+  const d=await r.json();
+  $id('dc-overview').innerHTML=`<div class="card">
+    <div class="card-title">📋 Section Details</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="val">${d.name||'—'}</div><div class="lbl">Section Name</div></div>
+      <div class="stat-card"><div class="val">${d.program||'—'}</div><div class="lbl">Program</div></div>
+      <div class="stat-card"><div class="val">${d.semester||'—'}</div><div class="lbl">Semester</div></div>
+      <div class="stat-card"><div class="val">${d.student_count||0}</div><div class="lbl">Students</div></div>
+    </div>
+  </div>`;
+}
+async function loadDCStudents(){
+  $id('dc-students').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/students');
+  const d=await r.json();
+  const students=d.students||[];
+  $id('dc-students').innerHTML=`<div class="card"><div class="card-title">Students (${students.length})</div>
+  ${students.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Enrolled</th><th>Actions</th></tr></thead>
+    <tbody>${students.map(s=>`<tr>
+      <td>${s.name}</td><td>${s.email}</td>
+      <td>${new Date(s.enrolled_at).toLocaleDateString()}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="viewStudentReport(${s.student_id},'${escHtml(s.name)}')">Progress Report</button></td>
+    </tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No students in section.</p>'}</div>`;
+}
+async function viewStudentReport(studentId, studentName){
+  const r=await apiFetch(`/dc/students/${studentId}/report`);
+  if(!r||!r.ok){alert('Could not load report.');return;}
+  const d=await r.json();
+  const courses=d.courses||[];
+  let html=`<h3>${studentName}</h3><p style="color:var(--muted);font-size:.82rem">${d.email}</p>`;
+  if(!courses.length){html+='<p>No courses enrolled.</p>';}
+  courses.forEach(c=>{
+    html+=`<div style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.6rem">
+      <b>${c.code} – ${c.name}</b> <span style="color:var(--muted);font-size:.8rem">Section: ${c.section||'—'} | Teacher: ${c.teacher_name}</span>
+      <table style="width:100%;font-size:.82rem;margin-top:.4rem"><thead><tr>`;
+    ['Attendance','Quiz','Activity','Mid','Final'].forEach(cat=>html+=`<th style="background:var(--g);color:white;padding:.3rem .5rem">${cat}</th>`);
+    html+=`</tr></thead><tbody><tr>`;
+    ['attendance','quiz','activity','mid','final'].forEach(cat=>{
+      const marks=c.marks[cat]||[];
+      html+=`<td style="padding:.3rem .5rem;vertical-align:top">${marks.length?marks.map(m=>`${m.title}: ${m.marks_obtained??'–'}/${m.total_marks??'–'}`).join('<br>'):'—'}</td>`;
+    });
+    html+=`</tr></tbody></table></div>`;
+  });
+  openModal(`Progress Report – ${studentName}`, html);
+}
+async function loadDCSchedule(){
+  $id('dc-schedule').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/schedule');
+  const d=await r.json();
+  const sched=d.schedule||[];
+  $id('dc-schedule').innerHTML=`<div class="card"><div class="card-title">📅 Class Schedule</div>
+  ${sched.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Day</th><th>Course</th><th>Room</th><th>Start</th><th>End</th><th>Notes</th></tr></thead>
+    <tbody>${sched.map(s=>`<tr>
+      <td>${s.day}</td><td>${s.course_code}</td><td>${s.location_name}</td>
+      <td>${s.start_time||'—'}</td><td>${s.end_time||'—'}</td><td>${s.notes||'—'}</td>
+    </tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No schedule found for this section.</p>'}</div>`;
+}
+async function loadDCTeachers(){
+  $id('dc-teachers').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/teachers');
+  const d=await r.json();
+  const teachers=d.teachers||[];
+  $id('dc-teachers').innerHTML=`<div class="card"><div class="card-title">👩‍🏫 Teachers (${teachers.length})</div>
+  ${teachers.length?teachers.map(t=>`
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:.6rem">
+      <b>${t.name}</b> <span style="color:var(--muted);font-size:.82rem">${t.email}</span>
+      <div style="margin-top:.4rem">${t.courses.map(c=>`<span class="course-pill">${c.code} – ${c.name}</span>`).join('')}</div>
+    </div>`).join('')
+  :'<p style="color:var(--muted)">No teachers found for this section.</p>'}</div>`;
+}
+async function loadDCEnrollRequests(){
+  $id('dc-enroll').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/enrollment-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(q=>q.status==='pending');
+  $id('dc-enroll').innerHTML=`<div class="card"><div class="card-title">Enrollment Requests (${reqs.length})</div>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('dc-er-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('dc-er-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="dcBulkApprove()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="dcBulkReject()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('dc-er-chk',this)"/></th><th>Student</th><th>Course</th><th>Teacher</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="dc-er-chk" value="${q.request_id}"/></td>
+      <td>${q.student_name}</td><td>${q.course_code} — ${q.course_name}</td>
+      <td>${q.teacher_name}</td><td>${new Date(q.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="dcApproveEnroll(${q.request_id})">✓</button>
+        <button class="btn btn-sm btn-danger"  onclick="dcRejectEnroll(${q.request_id})">✗</button>
+      </td></tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No pending enrollment requests.</p>'}</div>`;
+}
+async function dcApproveEnroll(id){
+  const r=await apiFetch(`/dc/enrollment-requests/${id}/approve`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcRejectEnroll(id){
+  if(!confirm('Reject this enrollment request?'))return;
+  const r=await apiFetch(`/dc/enrollment-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcBulkApprove(){
+  const ids=getChecked('dc-er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/dc/enrollment-requests/bulk-approve',{method:'POST',body:JSON.stringify({request_ids:ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcBulkReject(){
+  const ids=getChecked('dc-er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} enrollment requests?`))return;
+  const r=await apiFetch('/dc/enrollment-requests/bulk-reject',{method:'POST',body:JSON.stringify({request_ids:ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
 }
 
 /* ── Student: Enrollment Requests ────────────────────────────────────── */

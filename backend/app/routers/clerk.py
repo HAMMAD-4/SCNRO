@@ -1,4 +1,4 @@
-"""Clerk router — head-clerk manages room schedules and location availability."""
+"""Clerk router — head-clerk manages room schedules, locations, sections, and course requests."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.auth_utils import get_current_user, require_role
 from app.database import get_db
-from app.models import Location, Schedule, User
+from app.models import Location, Schedule, Section, StudentSection, User
 
 router = APIRouter(prefix="/api/v1/clerk", tags=["Room Management"])
 
@@ -292,6 +292,7 @@ class CourseRequestCreate(BaseModel):
     name: str
     teacher_id: int
     section: Optional[str] = None
+    section_id: Optional[int] = None   # Section object for auto-enrollment
     semester: Optional[str] = None
 
 
@@ -311,12 +312,21 @@ def submit_course_request(
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found.")
 
+    # Validate section object if provided
+    sec_name = payload.section
+    if payload.section_id:
+        sec = db.query(Section).filter(Section.section_id == payload.section_id).first()
+        if not sec:
+            raise HTTPException(status_code=404, detail="Section not found.")
+        sec_name = sec_name or sec.name
+
     req = CourseRequest(
         clerk_id=current_user.user_id,
         code=payload.code,
         name=payload.name,
         teacher_id=payload.teacher_id,
-        section=payload.section,
+        section=sec_name,
+        section_id=payload.section_id,
         semester=payload.semester,
         status="pending",
     )
@@ -352,3 +362,209 @@ def list_my_course_requests(
             "created_at": str(r.created_at),
         })
     return {"requests": result}
+
+
+# ── Section Management ────────────────────────────────────────────────────────
+
+VALID_PROGRAMS = {"IT", "SE", "CS", "DS", "AI"}
+
+
+class SectionCreate(BaseModel):
+    name: str
+    program: str
+    semester: Optional[str] = None
+    coordinator_id: Optional[int] = None
+
+
+class SectionUpdate(BaseModel):
+    name: Optional[str] = None
+    program: Optional[str] = None
+    semester: Optional[str] = None
+    coordinator_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/sections")
+def list_sections(
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """List all sections."""
+    sections = db.query(Section).order_by(Section.program, Section.name).all()
+    result = []
+    for s in sections:
+        coord = db.query(User).filter(User.user_id == s.coordinator_id).first() if s.coordinator_id else None
+        student_count = db.query(StudentSection).filter(StudentSection.section_id == s.section_id).count()
+        result.append({
+            "section_id": s.section_id,
+            "name": s.name,
+            "program": s.program,
+            "semester": s.semester,
+            "coordinator_name": coord.name if coord else None,
+            "coordinator_id": s.coordinator_id,
+            "is_active": s.is_active,
+            "student_count": student_count,
+        })
+    return {"sections": result}
+
+
+@router.post("/sections", status_code=201)
+def create_section(
+    payload: SectionCreate,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Create a new academic section."""
+    if payload.program not in VALID_PROGRAMS:
+        raise HTTPException(status_code=400, detail=f"program must be one of: {', '.join(VALID_PROGRAMS)}")
+
+    if payload.coordinator_id:
+        coord = db.query(User).filter(
+            User.user_id == payload.coordinator_id,
+            User.role == "degree_coordinator",
+        ).first()
+        if not coord:
+            raise HTTPException(status_code=404, detail="Degree coordinator not found.")
+
+    sec = Section(
+        name=payload.name,
+        program=payload.program,
+        semester=payload.semester,
+        coordinator_id=payload.coordinator_id,
+    )
+    db.add(sec)
+    db.commit()
+    db.refresh(sec)
+    return {"message": "Section created.", "section_id": sec.section_id}
+
+
+@router.put("/sections/{section_id}")
+def update_section(
+    section_id: int,
+    payload: SectionUpdate,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Update a section."""
+    sec = db.query(Section).filter(Section.section_id == section_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found.")
+
+    if payload.program is not None:
+        if payload.program not in VALID_PROGRAMS:
+            raise HTTPException(status_code=400, detail=f"program must be one of: {', '.join(VALID_PROGRAMS)}")
+        sec.program = payload.program
+    if payload.name is not None:
+        sec.name = payload.name
+    if payload.semester is not None:
+        sec.semester = payload.semester
+    if payload.coordinator_id is not None:
+        coord = db.query(User).filter(
+            User.user_id == payload.coordinator_id,
+            User.role.in_(["degree_coordinator", "admin"]),
+        ).first()
+        if not coord:
+            raise HTTPException(status_code=404, detail="Coordinator not found.")
+        sec.coordinator_id = payload.coordinator_id
+    if payload.is_active is not None:
+        sec.is_active = payload.is_active
+
+    db.commit()
+    return {"message": "Section updated.", "section_id": section_id}
+
+
+@router.delete("/sections/{section_id}")
+def delete_section(
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Delete a section and its student memberships."""
+    sec = db.query(Section).filter(Section.section_id == section_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found.")
+    db.query(StudentSection).filter(StudentSection.section_id == section_id).delete()
+    db.delete(sec)
+    db.commit()
+    return {"message": "Section deleted.", "section_id": section_id}
+
+
+@router.get("/sections/{section_id}/students")
+def list_section_students(
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """List students enrolled in a section."""
+    sec = db.query(Section).filter(Section.section_id == section_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found.")
+
+    student_sections = db.query(StudentSection).filter(
+        StudentSection.section_id == section_id
+    ).all()
+    result = []
+    for ss in student_sections:
+        u = db.query(User).filter(User.user_id == ss.student_id).first()
+        if u:
+            result.append({
+                "student_id": u.user_id,
+                "name": u.name,
+                "email": u.email,
+                "enrolled_at": str(ss.enrolled_at),
+            })
+    return {"students": result, "section_id": section_id, "section_name": sec.name}
+
+
+class StudentEnrollRequest(BaseModel):
+    student_id: int
+
+
+@router.post("/sections/{section_id}/students", status_code=201)
+def add_student_to_section(
+    section_id: int,
+    payload: StudentEnrollRequest,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Assign a student to a section."""
+    sec = db.query(Section).filter(Section.section_id == section_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found.")
+
+    student = db.query(User).filter(
+        User.user_id == payload.student_id, User.role == "student"
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    existing = db.query(StudentSection).filter(
+        StudentSection.student_id == payload.student_id,
+        StudentSection.section_id == section_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Student already in this section.")
+
+    ss = StudentSection(student_id=payload.student_id, section_id=section_id)
+    db.add(ss)
+    db.commit()
+    return {"message": "Student added to section.", "student_id": payload.student_id, "section_id": section_id}
+
+
+@router.delete("/sections/{section_id}/students/{student_id}")
+def remove_student_from_section(
+    section_id: int,
+    student_id: int,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Remove a student from a section."""
+    ss = db.query(StudentSection).filter(
+        StudentSection.section_id == section_id,
+        StudentSection.student_id == student_id,
+    ).first()
+    if not ss:
+        raise HTTPException(status_code=404, detail="Student not found in section.")
+    db.delete(ss)
+    db.commit()
+    return {"message": "Student removed from section."}

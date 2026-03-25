@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth_utils import require_role
+from app.auth_utils import get_current_user, require_role
 from app.database import get_db
 from app.models import ItemLostFound, User
 
@@ -22,7 +22,6 @@ router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
 
 
 class ItemReportRequest(BaseModel):
-    user_id: int = Field(..., description="ID of the reporting user")
     item_name: str = Field(..., max_length=100)
     description: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=255)
@@ -45,10 +44,14 @@ class ItemReportResponse(BaseModel):
 
 
 @router.post("/items/report", response_model=ItemReportResponse, status_code=201)
-def report_item(payload: ItemReportRequest, db: Session = Depends(get_db)):
+def report_item(
+    payload: ItemReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Report a lost or found item on the community board."""
     item = ItemLostFound(
-        user_id=payload.user_id,
+        user_id=current_user.user_id,
         item_name=payload.item_name,
         description=payload.description,
         image_url=payload.image_url,
@@ -65,12 +68,13 @@ def report_item(payload: ItemReportRequest, db: Session = Depends(get_db)):
 def list_items(
     status: Optional[str] = Query(None, description="Filter by status: Lost, Found, Claimed"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List all lost & found items, optionally filtered by status."""
     query = db.query(ItemLostFound)
     if status:
-        if status not in ("Lost", "Found", "Claimed"):
-            raise HTTPException(status_code=400, detail="status must be one of: Lost, Found, Claimed")
+        if status not in ("Lost", "Found", "Claimed", "Closed"):
+            raise HTTPException(status_code=400, detail="status must be one of: Lost, Found, Claimed, Closed")
         query = query.filter(ItemLostFound.status == status)
 
     items = query.order_by(ItemLostFound.created_at.desc()).all()
@@ -92,7 +96,11 @@ def list_items(
 
 
 @router.patch("/items/{item_id}/claim")
-def claim_item(item_id: int, db: Session = Depends(get_db)):
+def claim_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Mark an item as claimed."""
     item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
     if not item:
