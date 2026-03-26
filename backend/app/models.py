@@ -101,6 +101,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     # Roles: admin | teacher | student | sac | head_clerk | degree_coordinator
     role = Column(String(30), nullable=False)
+    # Department: IT | CS | SE | DS | AI (used for scoping data by program)
+    department = Column(String(20))
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -121,6 +123,8 @@ class SignupRequest(Base):
     password_hash = Column(String(255), nullable=False)
     # Roles: teacher | student | sac | head_clerk  (admin never self-registers)
     role_requested = Column(String(30), nullable=False)
+    # Department: IT | CS | SE | DS | AI
+    department = Column(String(20))
     # pending | approved | rejected
     status = Column(String(20), default="pending")
     created_at = Column(TIMESTAMP, server_default=func.now())

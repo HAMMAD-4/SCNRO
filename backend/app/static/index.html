@@ -39,9 +39,11 @@ html.guest   #screen-app    {display:none!important}
 html.guest   #screen-signup {display:none!important}
 html.authed  #screen-login  {display:none!important}
 html.authed  #screen-signup {display:none!important}
-html:not(.guest):not(.authed) #screen-login,
-html:not(.guest):not(.authed) #screen-app,
-html:not(.guest):not(.authed) #screen-signup{display:none!important}
+html.signup  #screen-login  {display:none!important}
+html.signup  #screen-app    {display:none!important}
+html:not(.guest):not(.authed):not(.signup) #screen-login,
+html:not(.guest):not(.authed):not(.signup) #screen-app,
+html:not(.guest):not(.authed):not(.signup) #screen-signup{display:none!important}
 
 /* ── Typography ── */
 h2{font-size:1.3rem;font-weight:700;color:var(--g);margin-bottom:1rem}
@@ -207,12 +209,21 @@ tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
       <label for="su-email">University Email</label>
       <input id="su-email" type="email" placeholder="yourname@pucit.edu.pk" required/>
       <label for="su-role">Role</label>
-      <select id="su-role">
+      <select id="su-role" onchange="updateSignupDeptVisibility()">
         <option value="student">Student</option>
         <option value="teacher">Teacher / Lecturer</option>
         <option value="sac">SAC Officer</option>
         <option value="head_clerk">Head Clerk</option>
         <option value="degree_coordinator">Degree Coordinator</option>
+      </select>
+      <label for="su-dept">Department</label>
+      <select id="su-dept">
+        <option value="">— Select Department —</option>
+        <option value="IT">IT</option>
+        <option value="CS">CS</option>
+        <option value="SE">SE</option>
+        <option value="DS">DS</option>
+        <option value="AI">AI</option>
       </select>
       <label for="su-pass">Password</label>
       <input id="su-pass" type="password" placeholder="Min 6 characters" required/>
@@ -295,9 +306,70 @@ function fmtRole(r) {
 }
 function badge(txt, cls) { return `<span class="badge ${cls}">${txt}</span>`; }
 
+/* ═══════════════════════════════ THEME ══════════════════════════════ */
+const THEMES = {
+  green: {g:'#006633',gd:'#004d26',gl:'#e6f4ee',au:'#C9A227',ald:'#a07d15',text:'#222',bg:'#f4f6f8'},
+  blue:  {g:'#1d4ed8',gd:'#1e3a8a',gl:'#dbeafe',au:'#f59e0b',ald:'#d97706',text:'#1e293b',bg:'#f0f4ff'},
+  dark:  {g:'#1f2937',gd:'#111827',gl:'#374151',au:'#f59e0b',ald:'#d97706',text:'#e5e7eb',bg:'#0f172a'},
+  purple:{g:'#7c3aed',gd:'#5b21b6',gl:'#ede9fe',au:'#f59e0b',ald:'#d97706',text:'#1e1b4b',bg:'#faf5ff'},
+  red:   {g:'#dc2626',gd:'#991b1b',gl:'#fee2e2',au:'#f59e0b',ald:'#d97706',text:'#1c1917',bg:'#fff5f5'},
+};
+const FONTS = {
+  segoe:  "'Segoe UI', Arial, sans-serif",
+  roboto: "'Roboto', 'Segoe UI', sans-serif",
+  inter:  "'Inter', 'Segoe UI', sans-serif",
+  mono:   "'Courier New', Courier, monospace",
+  serif:  "Georgia, 'Times New Roman', serif",
+};
+
+function applyTheme(settings) {
+  const t = THEMES[settings.theme] || THEMES.green;
+  const root = document.documentElement;
+  root.style.setProperty('--g',   t.g);
+  root.style.setProperty('--gd',  t.gd);
+  root.style.setProperty('--gl',  t.gl);
+  root.style.setProperty('--au',  t.au);
+  root.style.setProperty('--ald', t.ald);
+  root.style.setProperty('--text',t.text);
+  if (settings.primary_color) root.style.setProperty('--g',   settings.primary_color);
+  if (settings.accent_color)  root.style.setProperty('--au',  settings.accent_color);
+  document.body.style.background = settings.bg_color || t.bg;
+  document.body.style.color      = t.text;
+  document.body.style.fontFamily = FONTS[settings.font] || FONTS.segoe;
+  // Portal name in sidebar
+  const brandEl = document.querySelector('.sidebar-brand span');
+  if (brandEl && settings.portal_name) brandEl.innerHTML = `${settings.portal_name}<br/>PUCIT`;
+  document.title = settings.portal_name || 'SCNRO – PUCIT Smart Campus';
+  // Logo
+  const logoEl = document.querySelector('.sidebar-brand .logo');
+  if (logoEl && settings.logo_url) {
+    logoEl.innerHTML = `<img src="${settings.logo_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>`;
+  }
+}
+
+async function loadAndApplySettings() {
+  try {
+    const r = await apiFetch('/admin/settings');
+    if (!r || !r.ok) return;
+    const d = await r.json();
+    if (d.settings) applyTheme(d.settings);
+  } catch(e) { /* ignore */ }
+}
+
 /* ═══════════════════════════════ AUTH ═══════════════════════════════ */
-function showLogin()  { $id('screen-signup').style.display='none'; $id('screen-login').style.display='flex'; }
-function showSignup() { $id('screen-login').style.display='none'; $id('screen-signup').style.display='flex'; }
+function showLogin() {
+  document.documentElement.className = 'guest';
+  $id('screen-signup').style.display = 'none';
+  $id('screen-login').style.display  = 'flex';
+}
+function showSignup() {
+  document.documentElement.className = 'signup';
+  $id('screen-login').style.display  = 'none';
+  $id('screen-signup').style.display = 'flex';
+}
+function updateSignupDeptVisibility() {
+  // All roles get a department field — always visible
+}
 
 async function doLogin(e) {
   e && e.preventDefault();
@@ -332,13 +404,14 @@ async function doSignup() {
   const name  = $id('su-name').value.trim();
   const email = $id('su-email').value.trim();
   const role  = $id('su-role').value;
+  const dept  = $id('su-dept').value;
   const pass  = $id('su-pass').value;
   const msg   = $id('signup-msg');
   if (!name||!email||!pass) { showMsg(msg,'All fields are required.'); return; }
   if (pass.length < 6)      { showMsg(msg,'Password must be at least 6 characters.'); return; }
   const r = await apiFetch('/auth/signup-request', {
     method:'POST',
-    body: JSON.stringify({name,email,password:pass,role:role})
+    body: JSON.stringify({name, email, password:pass, role, department: dept||null})
   });
   if (!r) return;
   const data = await r.json();
@@ -359,16 +432,17 @@ function doLogout() {
 
 /* ═══════════════════════════════ NAV ════════════════════════════════ */
 const NAV_ALL = [
-  {id:'dashboard',  ico:'🏠', lbl:'Dashboard'},
-  {id:'free_rooms', ico:'🚪', lbl:'Free Rooms'},
-  {id:'navigate',   ico:'🗺', lbl:'Navigate'},
-  {id:'lostfound',  ico:'🔍', lbl:'Lost & Found'},
-  {id:'faculty',    ico:'👥', lbl:'Faculty',         roles:['admin','degree_coordinator']},
-  {id:'admin_panel',ico:'⚙',  lbl:'Admin Panel',     roles:['admin']},
-  {id:'marks_mgmt', ico:'📊', lbl:'Marks Mgmt',      roles:['teacher','admin']},
-  {id:'my_grades',  ico:'🎓', lbl:'My Grades',        roles:['student']},
-  {id:'room_mgmt',  ico:'🏢', lbl:'Room Mgmt',        roles:['head_clerk','admin']},
-  {id:'dc_panel',   ico:'🎯', lbl:'My Section',       roles:['degree_coordinator']},
+  {id:'dashboard',   ico:'🏠', lbl:'Dashboard'},
+  {id:'free_rooms',  ico:'🚪', lbl:'Free Rooms'},
+  {id:'navigate',    ico:'🗺', lbl:'Navigate'},
+  {id:'lostfound',   ico:'🔍', lbl:'Lost & Found'},
+  {id:'faculty',     ico:'👥', lbl:'Faculty',         roles:['admin','degree_coordinator']},
+  {id:'admin_panel', ico:'⚙',  lbl:'Admin Panel',     roles:['admin']},
+  {id:'marks_mgmt',  ico:'📊', lbl:'Marks Mgmt',      roles:['teacher','admin']},
+  {id:'my_grades',   ico:'🎓', lbl:'My Grades',        roles:['student']},
+  {id:'room_mgmt',   ico:'🏢', lbl:'Room Mgmt',        roles:['head_clerk','admin']},
+  {id:'course_mgmt', ico:'📚', lbl:'Course Mgmt',      roles:['head_clerk','admin']},
+  {id:'dc_panel',    ico:'🎯', lbl:'My Section',       roles:['degree_coordinator']},
 ];
 
 let _currentPane = '';
@@ -407,9 +481,15 @@ function bootApp() {
 
   $id('sb-name').textContent  = _user.name;
   $id('sb-email').textContent = _user.email;
-  $id('sb-role-badge').textContent = fmtRole(_user.role);
+  $id('sb-role-badge').textContent = fmtRole(_user.role) + (_user.department ? ' · ' + _user.department : '');
 
   buildNav();
+
+  // Apply portal settings (theme, name, logo)
+  if (_user.role === 'admin' || _user.role === 'teacher' || _user.role === 'head_clerk' ||
+      _user.role === 'degree_coordinator') {
+    loadAndApplySettings();
+  }
 
   // Pick the first pane visible for this role
   const first = NAV_ALL.find(n => !n.roles || n.roles.includes(_user.role));
@@ -611,9 +691,9 @@ PANES.faculty = async mc => {
   loadFacTeachers();
 };
 function facTab(btn, pane) {
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['fac-teachers','fac-clerical'].forEach(id=>$id(id).style.display='none');
+  ['fac-teachers','fac-clerical'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
   $id(pane).style.display='';
   if (pane==='fac-teachers' && !$id('fac-teachers').innerHTML) loadFacTeachers();
   if (pane==='fac-clerical' && !$id('fac-clerical').innerHTML) loadFacClerical();
@@ -623,22 +703,14 @@ async function loadFacTeachers() {
   const r=await apiFetch('/admin/staff?role=teacher');
   const d=await r.json();
   const users=(d.staff||[]).filter(u=>u.role==='teacher');
-  // Also get faculty records for department info
-  const fr=await apiFetch('/faculty');
-  const fd=await fr.json();
-  const facMap={};
-  (fd.faculty||[]).forEach(f=>{ facMap[f.name]={dept:f.department,desig:f.designation,avail:f.is_available}; });
   $id('fac-teachers').innerHTML=`<div class="card"><div class="card-title">Teachers (${users.length})</div>
   ${users.length?`<div class="tbl-wrap"><table>
-    <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Designation</th><th>Status</th></tr></thead>
-    <tbody>${users.map(u=>{
-      const fi=facMap[u.name]||{};
-      return `<tr>
-        <td>${u.name}</td><td>${u.email}</td>
-        <td>${fi.dept||'—'}</td><td>${fi.desig||'—'}</td>
-        <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
-      </tr>`;
-    }).join('')}</tbody></table></div>`
+    <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Status</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${u.name}</td><td>${u.email}</td>
+      <td>${u.department||'—'}</td>
+      <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
+    </tr>`).join('')}</tbody></table></div>`
     :'<p style="color:var(--muted)">No teachers found.</p>'}</div>`;
 }
 async function loadFacClerical() {
@@ -648,10 +720,11 @@ async function loadFacClerical() {
   const users=(d.staff||[]).filter(u=>['head_clerk','sac','degree_coordinator'].includes(u.role));
   $id('fac-clerical').innerHTML=`<div class="card"><div class="card-title">Clerical & Administrative Staff (${users.length})</div>
   ${users.length?`<div class="tbl-wrap"><table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th></tr></thead>
     <tbody>${users.map(u=>`<tr>
       <td>${u.name}</td><td>${u.email}</td>
       <td>${badge(fmtRole(u.role),'badge-blue')}</td>
+      <td>${u.department||'—'}</td>
       <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
     </tr>`).join('')}</tbody></table></div>`
     :'<p style="color:var(--muted)">No clerical staff found.</p>'}</div>`;
@@ -680,9 +753,9 @@ PANES.admin_panel = async mc => {
   loadSignupRequests();
 };
 function apTab(btn, pane) {
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['ap-signups','ap-staff','ap-mcr','ap-course-req','ap-enroll-req','ap-settings'].forEach(id=>$id(id).style.display='none');
+  ['ap-signups','ap-staff','ap-mcr','ap-course-req','ap-enroll-req','ap-settings'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
   $id(pane).style.display='';
   if (pane==='ap-signups'    && !$id('ap-signups').innerHTML)    loadSignupRequests();
   if (pane==='ap-staff'      && !$id('ap-staff').innerHTML)      loadStaffMgmt();
@@ -690,7 +763,6 @@ function apTab(btn, pane) {
   if (pane==='ap-course-req' && !$id('ap-course-req').innerHTML) loadAdminCourseRequests();
   if (pane==='ap-enroll-req' && !$id('ap-enroll-req').innerHTML) loadAdminEnrollRequests();
   if (pane==='ap-settings')                                       loadAdminSettings();
-  // always reload MCR when switching to it
   if (pane==='ap-mcr') loadMarkChangeRequests();
 }
 async function loadSignupRequests() {
@@ -707,10 +779,11 @@ async function loadSignupRequests() {
     <button class="btn btn-sm btn-danger"  onclick="bulkRejectSignups()">✗ Bulk Reject</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th><input type="checkbox" id="su-chk-all" onchange="toggleAll('su-chk',this)"/></th><th>Name</th><th>Email</th><th>Role</th><th>Date</th><th>Actions</th></tr></thead>
+    <thead><tr><th><input type="checkbox" id="su-chk-all" onchange="toggleAll('su-chk',this)"/></th><th>Name</th><th>Email</th><th>Role</th><th>Dept</th><th>Date</th><th>Actions</th></tr></thead>
     <tbody>${reqs.map(q=>`<tr>
       <td><input type="checkbox" class="su-chk" value="${q.request_id}"/></td>
       <td>${q.name}</td><td>${q.email}</td><td>${badge(fmtRole(q.role_requested),'badge-blue')}</td>
+      <td>${q.department||'—'}</td>
       <td>${new Date(q.created_at).toLocaleDateString()}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="approveSignup(${q.request_id})">Approve</button>
@@ -753,16 +826,21 @@ async function loadStaffMgmt() {
   $id('ap-staff').innerHTML=`<div class="card"><div class="card-title">Portal Users (${users.length})</div>
   <div style="margin-bottom:.6rem"><button class="btn btn-primary btn-sm" onclick="openAddStaffModal()">➕ Add User</button></div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Dept</th><th>Active</th><th>Actions</th></tr></thead>
     <tbody>${users.map(u=>`<tr>
       <td>${u.name}</td><td>${u.email}</td><td>${badge(fmtRole(u.role),'badge-blue')}</td>
+      <td>${u.department||'—'}</td>
       <td>${badge(u.is_active?'Yes':'No',u.is_active?'badge-green':'badge-red')}</td>
       <td>
-        <button class="btn btn-sm btn-ghost" onclick="openEditStaffModal(${u.user_id},'${escHtml(u.name)}','${escHtml(u.email)}','${u.role}',${u.is_active})">Edit</button>
+        <button class="btn btn-sm btn-ghost" onclick="openEditStaffModal(${u.user_id},'${escHtml(u.name)}','${escHtml(u.email)}','${u.role}',${u.is_active},'${escHtml(u.department||'')}')">Edit</button>
         ${u.is_active
           ? `<button class="btn btn-sm btn-danger" onclick="deleteStaff(${u.user_id})">Deactivate</button>`
           : `<button class="btn btn-sm btn-primary" onclick="reactivateStaff(${u.user_id})">Activate</button>`}
       </td></tr>`).join('')}</tbody></table></div></div>`;
+}
+const DEPT_OPTIONS = ['','IT','CS','SE','DS','AI'];
+function deptSelect(id,val=''){
+  return `<select id="${id}"><option value="">— No Dept —</option>${DEPT_OPTIONS.filter(d=>d).map(d=>`<option value="${d}" ${d===val?'selected':''}>${d}</option>`).join('')}</select>`;
 }
 function openAddStaffModal(){
   openModal('Add User',`
@@ -776,20 +854,22 @@ function openAddStaffModal(){
         <option value="degree_coordinator">Degree Coordinator</option>
         <option value="admin">Admin</option>
       </select>
-    </div>`,
+    </div>
+    <div class="form-field"><label>Department</label>${deptSelect('as-dept')}</div>`,
     `<button class="btn btn-primary btn-sm" onclick="addStaff()">Add</button>
      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
   );
 }
 async function addStaff(){
   const payload={email:$id('as-email').value.trim(),name:$id('as-name').value.trim(),
-    password:$id('as-pass').value,role:$id('as-role').value};
+    password:$id('as-pass').value,role:$id('as-role').value,
+    department:$id('as-dept').value||null};
   if(!payload.name||!payload.email||!payload.password){alert('Fill all fields.');return;}
   const r=await apiFetch('/admin/staff',{method:'POST',body:JSON.stringify(payload)});
   if(!r.ok){alert((await r.json()).detail);return;}
   closeModal(); loadStaffMgmt();
 }
-function openEditStaffModal(id,name,email,role,active){
+function openEditStaffModal(id,name,email,role,active,dept=''){
   openModal('Edit User',`
     <div class="form-field"><label>Name</label><input id="es-name" value="${escHtml(name)}"/></div>
     <div class="form-field"><label>Email</label><input id="es-email" value="${escHtml(email)}"/></div>
@@ -804,6 +884,7 @@ function openEditStaffModal(id,name,email,role,active){
         <option value="admin"  ${role==='admin'?'selected':''}>Admin</option>
       </select>
     </div>
+    <div class="form-field"><label>Department</label>${deptSelect('es-dept',dept)}</div>
     <div class="form-field"><label>Active</label>
       <select id="es-active">
         <option value="true"  ${active?'selected':''}>Yes</option>
@@ -819,6 +900,7 @@ async function saveStaff(id){
   const n=$id('es-name').value.trim(),e=$id('es-email').value.trim(),p=$id('es-pass').value;
   if(n) payload.name=n; if(e) payload.email=e; if(p) payload.password=p;
   payload.role=$id('es-role').value;
+  payload.department=$id('es-dept').value||null;
   payload.is_active=$id('es-active').value==='true';
   const r=await apiFetch(`/admin/staff/${id}`,{method:'PUT',body:JSON.stringify(payload)});
   if(!r.ok){alert((await r.json()).detail);return;}
@@ -978,26 +1060,71 @@ async function loadAdminSettings() {
   $id('ap-settings').innerHTML=`
   <div class="card">
     <div class="card-title">⚙ Portal Settings</div>
-    <div class="form-row">
-      <div class="form-field"><label>Portal Name</label><input id="set-name" value="${escHtml(s.portal_name||'')}"/></div>
-      <div class="form-field"><label>Theme</label>
-        <select id="set-theme">
-          <option value="green" ${s.theme==='green'?'selected':''}>Green (PUCIT)</option>
-          <option value="blue"  ${s.theme==='blue'?'selected':''}>Blue</option>
-          <option value="dark"  ${s.theme==='dark'?'selected':''}>Dark</option>
-        </select>
-      </div>
-      <div class="form-field"><label>Portal Availability</label>
-        <select id="set-avail">
-          <option value="true"  ${s.portal_available!=='false'?'selected':''}>Available</option>
-          <option value="false" ${s.portal_available==='false'?'selected':''}>Unavailable (Maintenance)</option>
-        </select>
+    <div class="tab-bar" style="margin-bottom:1rem">
+      <button class="tab-btn active" onclick="setTab(this,'set-general')">General</button>
+      <button class="tab-btn" onclick="setTab(this,'set-appearance')">Appearance</button>
+      <button class="tab-btn" onclick="setTab(this,'set-access')">Access</button>
+    </div>
+    <!-- General -->
+    <div id="set-general">
+      <div class="form-row">
+        <div class="form-field"><label>Portal Name</label><input id="set-name" value="${escHtml(s.portal_name||'SCNRO – PUCIT')}"/></div>
+        <div class="form-field"><label>Logo URL (optional)</label><input id="set-logo" value="${escHtml(s.logo_url||'')}" placeholder="https://…"/></div>
       </div>
     </div>
-    <div class="form-field"><label>Unavailable Message</label>
-      <textarea id="set-msg" rows="2">${escHtml(s.unavailable_message||'')}</textarea>
+    <!-- Appearance -->
+    <div id="set-appearance" style="display:none">
+      <div class="form-row">
+        <div class="form-field"><label>Theme Preset</label>
+          <select id="set-theme" onchange="previewTheme()">
+            <option value="green"  ${s.theme==='green'||!s.theme?'selected':''}>Green (PUCIT)</option>
+            <option value="blue"   ${s.theme==='blue'?'selected':''}>Blue</option>
+            <option value="dark"   ${s.theme==='dark'?'selected':''}>Dark</option>
+            <option value="purple" ${s.theme==='purple'?'selected':''}>Purple</option>
+            <option value="red"    ${s.theme==='red'?'selected':''}>Red</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Font Family</label>
+          <select id="set-font">
+            <option value="segoe"  ${s.font==='segoe'||!s.font?'selected':''}>Segoe UI (default)</option>
+            <option value="roboto" ${s.font==='roboto'?'selected':''}>Roboto</option>
+            <option value="inter"  ${s.font==='inter'?'selected':''}>Inter</option>
+            <option value="mono"   ${s.font==='mono'?'selected':''}>Monospace</option>
+            <option value="serif"  ${s.font==='serif'?'selected':''}>Serif</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Primary Color (overrides theme)</label>
+          <input type="color" id="set-primary-color" value="${s.primary_color||'#006633'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+          <span style="font-size:.78rem;color:var(--muted);margin-left:.4rem">Leave as theme default if unchanged</span>
+        </div>
+        <div class="form-field"><label>Accent Color</label>
+          <input type="color" id="set-accent-color" value="${s.accent_color||'#C9A227'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+        </div>
+        <div class="form-field"><label>Background Color</label>
+          <input type="color" id="set-bg-color" value="${s.bg_color||'#f4f6f8'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+        </div>
+      </div>
+      <div style="margin-top:.6rem">
+        <button class="btn btn-ghost btn-sm" onclick="previewTheme()">👁 Preview</button>
+      </div>
     </div>
-    <div class="form-actions">
+    <!-- Access -->
+    <div id="set-access" style="display:none">
+      <div class="form-row">
+        <div class="form-field"><label>Portal Availability</label>
+          <select id="set-avail">
+            <option value="true"  ${s.portal_available!=='false'?'selected':''}>Available</option>
+            <option value="false" ${s.portal_available==='false'?'selected':''}>Unavailable (Maintenance)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-field"><label>Unavailable Message</label>
+        <textarea id="set-unavail-msg" rows="2">${escHtml(s.unavailable_message||'')}</textarea>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:1rem">
       <button class="btn btn-primary btn-sm" onclick="saveSettings()">💾 Save Settings</button>
     </div>
     <div id="set-msg-res"></div>
@@ -1008,17 +1135,42 @@ async function loadAdminSettings() {
     <button class="btn btn-danger btn-sm" onclick="resetAllData()">🗑 Erase All Data</button>
   </div>`;
 }
+function setTab(btn, pane) {
+  btn.closest('.card').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['set-general','set-appearance','set-access'].forEach(id=>{
+    const el=$id(id); if(el) el.style.display='none';
+  });
+  const el=$id(pane); if(el) el.style.display='';
+}
+function previewTheme() {
+  applyTheme({
+    theme: $id('set-theme')?.value,
+    font: $id('set-font')?.value,
+    primary_color: $id('set-primary-color')?.value,
+    accent_color: $id('set-accent-color')?.value,
+    bg_color: $id('set-bg-color')?.value,
+    portal_name: $id('set-name')?.value,
+    logo_url: $id('set-logo')?.value,
+  });
+}
 async function saveSettings(){
   const settings={
-    portal_name:$id('set-name').value.trim(),
-    theme:$id('set-theme').value,
-    portal_available:$id('set-avail').value,
-    unavailable_message:$id('set-msg').value.trim(),
+    portal_name: $id('set-name').value.trim(),
+    logo_url: $id('set-logo').value.trim(),
+    theme: $id('set-theme').value,
+    font: $id('set-font').value,
+    primary_color: $id('set-primary-color').value,
+    accent_color: $id('set-accent-color').value,
+    bg_color: $id('set-bg-color').value,
+    portal_available: $id('set-avail').value,
+    unavailable_message: $id('set-unavail-msg').value.trim(),
   };
   const r=await apiFetch('/admin/settings',{method:'PUT',body:JSON.stringify({settings})});
   const d=await r.json();
   if(!r.ok){$id('set-msg-res').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`;return;}
-  $id('set-msg-res').innerHTML='<div class="alert alert-success">✓ Settings saved.</div>';
+  applyTheme(settings);
+  $id('set-msg-res').innerHTML='<div class="alert alert-success">✓ Settings saved and applied.</div>';
 }
 async function resetAllData(){
   if(!confirm('⚠️ This will DELETE ALL data. Admin accounts will be preserved. Type "RESET" to confirm.'))return;
@@ -1311,25 +1463,126 @@ PANES.room_mgmt = async mc => {
   <div class="tab-bar">
     <button class="tab-btn active" onclick="rmTab(this,'rm-rooms')">Rooms</button>
     <button class="tab-btn" onclick="rmTab(this,'rm-schedules')">Schedules</button>
-    <button class="tab-btn" onclick="rmTab(this,'rm-course-req')">Course Requests</button>
-    <button class="tab-btn" onclick="rmTab(this,'rm-sections')">Sections</button>
   </div>
   <div id="rm-rooms"></div>
-  <div id="rm-schedules"  style="display:none"></div>
-  <div id="rm-course-req" style="display:none"></div>
-  <div id="rm-sections"   style="display:none"></div>`;
+  <div id="rm-schedules"  style="display:none"></div>`;
   loadRooms();
 };
 function rmTab(btn,pane){
-  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['rm-rooms','rm-schedules','rm-course-req','rm-sections'].forEach(id=>$id(id).style.display='none');
+  ['rm-rooms','rm-schedules'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
   $id(pane).style.display='';
   if(pane==='rm-rooms'      && !$id('rm-rooms').innerHTML)      loadRooms();
-  if(pane==='rm-schedules'  && !$id('rm-schedules').innerHTML)  loadSchedules();
   if(pane==='rm-schedules') loadSchedules();
-  if(pane==='rm-course-req') loadClerkCourseRequests();
-  if(pane==='rm-sections')   loadSections();
+}
+
+/* ── Course Management (Head Clerk & Admin) ────────────────────────── */
+PANES.course_mgmt = async mc => {
+  mc.innerHTML=`<h2>📚 Course Management</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="cmTab(this,'cm-course-req')">Course Requests</button>
+    <button class="tab-btn" onclick="cmTab(this,'cm-sections')">Sections</button>
+  </div>
+  <div id="cm-course-req"></div>
+  <div id="cm-sections" style="display:none"></div>`;
+  loadCMCourseRequests();
+};
+function cmTab(btn,pane){
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['cm-course-req','cm-sections'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if(pane==='cm-course-req') loadCMCourseRequests();
+  if(pane==='cm-sections')   loadCMSections();
+}
+async function loadCMCourseRequests(){
+  const el=$id('cm-course-req');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/course-requests');
+  const d=await r.json();
+  const reqs=d.requests||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Course Requests (${reqs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openCourseReqModal2()">➕ Register Course</button>
+    </div>
+    ${reqs.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Code</th><th>Name</th><th>Section</th><th>Semester</th><th>Teacher</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>${reqs.map(q=>`<tr>
+        <td>${q.code}</td><td>${q.name}</td>
+        <td>${q.section||'—'}</td><td>${q.semester||'—'}</td>
+        <td>${q.teacher_name||'—'}</td>
+        <td><span class="badge badge-${q.status==='approved'?'success':q.status==='rejected'?'danger':'warn'}">${q.status}</span></td>
+        <td>${new Date(q.created_at).toLocaleDateString()}</td>
+      </tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No requests yet.</p>`}
+  </div>`;
+}
+async function loadCMSections(){
+  const el=$id('cm-sections');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/sections');
+  const d=await r.json();
+  const secs=d.sections||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Sections (${secs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddSectionModal()">➕ Add Section</button>
+    </div>
+    ${secs.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Name</th><th>Program</th><th>Semester</th><th>Coordinator</th><th>Students</th><th>Actions</th></tr></thead>
+      <tbody>${secs.map(s=>`<tr>
+        <td>${s.name}</td><td>${s.program}</td>
+        <td>${s.semester||'—'}</td><td>${s.coordinator_name||'—'}</td>
+        <td><button class="btn btn-sm btn-ghost" onclick="openManageSectionStudents(${s.section_id},'${escHtml(s.name)}')">${s.student_count}</button></td>
+        <td>
+          <button class="btn btn-sm btn-ghost" onclick="openEditSectionModal(${s.section_id},'${escHtml(s.name)}','${s.program}','${escHtml(s.semester||'')}',${s.coordinator_id||'null'})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteSection(${s.section_id})">Del</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No sections yet.</p>`}
+  </div>`;
+}
+async function openCourseReqModal2(){
+  const [teachersR, sectionsR] = await Promise.all([
+    apiFetch('/clerk/teachers').then(r=>r.json()),
+    apiFetch('/clerk/sections').then(r=>r.json()).catch(()=>({sections:[]})),
+  ]);
+  const teachers=teachersR.teachers||[];
+  const sections=sectionsR.sections||[];
+  openModal('Register Course (Request Admin Approval)',`
+    <div class="form-field"><label>Course Code *</label><input id="cr2-code" placeholder="e.g. CS-401"/></div>
+    <div class="form-field"><label>Course Name *</label><input id="cr2-name" placeholder="e.g. Algorithms"/></div>
+    <div class="form-field"><label>Assign Teacher *</label>
+      <select id="cr2-teacher"><option value="">— Select Teacher —</option>${teachers.length?teachers.map(t=>`<option value="${t.user_id}">${t.name}${t.department?' ('+t.department+')':''}</option>`).join(''):'<option disabled>No teachers found</option>'}</select>
+    </div>
+    <div class="form-field"><label>Section (from list)</label>
+      <select id="cr2-section-id">
+        <option value="">— No section —</option>
+        ${sections.map(s=>`<option value="${s.section_id}">${s.name} (${s.program})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-field"><label>Section Name (manual override)</label><input id="cr2-section" placeholder="A"/></div>
+    <div class="form-field"><label>Semester</label><input id="cr2-semester" placeholder="Spring 2025"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="submitCourseReq2()">Submit Request</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function submitCourseReq2(){
+  const secId=$id('cr2-section-id').value;
+  const payload={
+    code:$id('cr2-code').value.trim(),
+    name:$id('cr2-name').value.trim(),
+    teacher_id:parseInt($id('cr2-teacher').value),
+    section:$id('cr2-section').value.trim()||undefined,
+    section_id:secId?parseInt(secId):undefined,
+    semester:$id('cr2-semester').value.trim()||undefined,
+  };
+  if(!payload.code||!payload.name||!payload.teacher_id){alert('Code, Name and Teacher are required.');return;}
+  const r=await apiFetch('/clerk/course-requests',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadCMCourseRequests();
 }
 async function loadRooms(){
   const el=$id('rm-rooms');
@@ -1533,95 +1786,19 @@ async function deleteSchedule(id){
 
 /* ── Clerk: Course Requests ──────────────────────────────────────────── */
 async function loadClerkCourseRequests(){
-  const el=$id('rm-course-req');
-  el.innerHTML='<span class="spinner"></span>';
-  const r=await apiFetch('/clerk/course-requests');
-  const d=await r.json();
-  const reqs=d.requests||[];
-  el.innerHTML=`<div class="card">
-    <div class="card-title">My Course Requests</div>
-    <div style="margin-bottom:.6rem"><button class="btn btn-primary btn-sm" onclick="openCourseReqModal()">➕ Register Course</button></div>
-    ${reqs.length?`<div class="tbl-wrap"><table>
-      <thead><tr><th>Code</th><th>Name</th><th>Teacher</th><th>Section</th><th>Semester</th><th>Status</th><th>Date</th></tr></thead>
-      <tbody>${reqs.map(q=>`<tr>
-        <td>${q.code}</td><td>${q.name}</td><td>${q.teacher_name}</td>
-        <td>${q.section||'–'}</td><td>${q.semester||'–'}</td>
-        <td>${badge(q.status, q.status==='approved'?'badge-green':q.status==='rejected'?'badge-red':'badge-blue')}</td>
-        <td>${new Date(q.created_at).toLocaleDateString()}</td>
-      </tr>`).join('')}</tbody></table></div>`
-    :`<p style="color:var(--muted)">No requests yet.</p>`}
-  </div>`;
-}
-async function openCourseReqModal(){
-  const [teachersR, sectionsR] = await Promise.all([
-    apiFetch('/admin/staff').then(r=>r.json()),
-    apiFetch('/clerk/sections').then(r=>r.json()).catch(()=>({sections:[]})),
-  ]);
-  const teachers=(teachersR.staff||[]).filter(u=>u.role==='teacher'&&u.is_active);
-  const sections=sectionsR.sections||[];
-  openModal('Register Course (Request Admin Approval)',`
-    <div class="form-field"><label>Course Code *</label><input id="cr-code" placeholder="e.g. CS-401"/></div>
-    <div class="form-field"><label>Course Name *</label><input id="cr-name" placeholder="e.g. Algorithms"/></div>
-    <div class="form-field"><label>Assign Teacher *</label>
-      <select id="cr-teacher">${teachers.map(t=>`<option value="${t.user_id}">${t.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-field"><label>Section (select from list or type)</label>
-      <select id="cr-section-id">
-        <option value="">— No section (manual) —</option>
-        ${sections.map(s=>`<option value="${s.section_id}">${s.name} (${s.program})</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-field"><label>Section Name (manual, if no section selected)</label><input id="cr-section" placeholder="A"/></div>
-    <div class="form-field"><label>Semester</label><input id="cr-semester" placeholder="Spring 2025"/></div>`,
-    `<button class="btn btn-primary btn-sm" onclick="submitCourseReq()">Submit Request</button>
-     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
-  );
-}
-async function submitCourseReq(){
-  const secId=$id('cr-section-id').value;
-  const payload={
-    code:$id('cr-code').value.trim(),
-    name:$id('cr-name').value.trim(),
-    teacher_id:parseInt($id('cr-teacher').value),
-    section:$id('cr-section').value.trim()||undefined,
-    section_id:secId?parseInt(secId):undefined,
-    semester:$id('cr-semester').value.trim()||undefined,
-  };
-  if(!payload.code||!payload.name||!payload.teacher_id){alert('Code, Name and Teacher are required.');return;}
-  const r=await apiFetch('/clerk/course-requests',{method:'POST',body:JSON.stringify(payload)});
-  if(!r.ok){alert((await r.json()).detail);return;}
-  closeModal(); loadClerkCourseRequests();
+  // Redirect to new course management pane function
+  if($id('cm-course-req')) { loadCMCourseRequests(); return; }
 }
 
 /* ── Section Management (Head Clerk) ─────────────────────────────────── */
 async function loadSections() {
-  const el=$id('rm-sections');
-  el.innerHTML='<span class="spinner"></span>';
-  const r=await apiFetch('/clerk/sections');
-  const d=await r.json();
-  const secs=d.sections||[];
-  el.innerHTML=`<div class="card">
-    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
-      <span class="card-title" style="margin:0">Sections (${secs.length})</span>
-      <button class="btn btn-primary btn-sm" onclick="openAddSectionModal()">➕ Add Section</button>
-    </div>
-    ${secs.length?`<div class="tbl-wrap"><table>
-      <thead><tr><th>Name</th><th>Program</th><th>Semester</th><th>Coordinator</th><th>Students</th><th>Actions</th></tr></thead>
-      <tbody>${secs.map(s=>`<tr>
-        <td>${s.name}</td><td>${badge(s.program,'badge-blue')}</td>
-        <td>${s.semester||'—'}</td><td>${s.coordinator_name||'—'}</td>
-        <td>${s.student_count}</td>
-        <td>
-          <button class="btn btn-sm btn-ghost" onclick="openManageSectionStudents(${s.section_id},'${escHtml(s.name)}')">Students</button>
-          <button class="btn btn-sm btn-ghost" onclick="openEditSectionModal(${s.section_id},'${escHtml(s.name)}','${s.program}','${escHtml(s.semester||'')}',${s.coordinator_id||'null'})">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteSection(${s.section_id})">Del</button>
-        </td>
-      </tr>`).join('')}</tbody></table></div>`
-    :'<p style="color:var(--muted)">No sections yet.</p>'}
-  </div>`;
+  // Try to refresh cm-sections (course_mgmt pane) if it exists
+  const el=$id('cm-sections');
+  if(el) { loadCMSections(); return; }
 }
 async function openAddSectionModal(){
-  const dcs=await apiFetch('/admin/staff').then(r=>r.json()).then(d=>(d.staff||[]).filter(u=>u.role==='degree_coordinator'&&u.is_active));
+  const dcsR=await apiFetch('/clerk/degree-coordinators').then(r=>r.json());
+  const dcs=dcsR.coordinators||[];
   openModal('Add Section',`
     <div class="form-field"><label>Section Name *</label><input id="sec-name" placeholder="e.g. CS-6A"/></div>
     <div class="form-field"><label>Program *</label>
@@ -1629,7 +1806,7 @@ async function openAddSectionModal(){
     </div>
     <div class="form-field"><label>Semester</label><input id="sec-sem" placeholder="Spring 2025"/></div>
     <div class="form-field"><label>Degree Coordinator</label>
-      <select id="sec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}">${u.name}</option>`).join('')}</select>
+      <select id="sec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}">${u.name}${u.department?' ('+u.department+')':''}</option>`).join('')}${!dcs.length?'<option disabled>No degree coordinators — add one first</option>':''}</select>
     </div>`,
     `<button class="btn btn-primary btn-sm" onclick="addSection()">Add</button>
      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
@@ -1645,10 +1822,12 @@ async function addSection(){
   if(!payload.name){alert('Section name required.');return;}
   const r=await apiFetch('/clerk/sections',{method:'POST',body:JSON.stringify(payload)});
   if(!r.ok){alert((await r.json()).detail);return;}
-  closeModal(); loadSections();
+  closeModal();
+  if($id('cm-sections')) loadCMSections();
 }
 async function openEditSectionModal(id,name,prog,sem,coordId){
-  const dcs=await apiFetch('/admin/staff').then(r=>r.json()).then(d=>(d.staff||[]).filter(u=>u.role==='degree_coordinator'&&u.is_active));
+  const dcsR=await apiFetch('/clerk/degree-coordinators').then(r=>r.json());
+  const dcs=dcsR.coordinators||[];
   openModal('Edit Section',`
     <div class="form-field"><label>Section Name</label><input id="esec-name" value="${escHtml(name)}"/></div>
     <div class="form-field"><label>Program</label>
@@ -1656,7 +1835,7 @@ async function openEditSectionModal(id,name,prog,sem,coordId){
     </div>
     <div class="form-field"><label>Semester</label><input id="esec-sem" value="${escHtml(sem)}"/></div>
     <div class="form-field"><label>Degree Coordinator</label>
-      <select id="esec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}" ${u.user_id==coordId?'selected':''}>${u.name}</option>`).join('')}</select>
+      <select id="esec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}" ${u.user_id==coordId?'selected':''}>${u.name}${u.department?' ('+u.department+')':''}</option>`).join('')}</select>
     </div>`,
     `<button class="btn btn-primary btn-sm" onclick="saveSection(${id})">Save</button>
      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
@@ -1671,26 +1850,28 @@ async function saveSection(id){
   };
   const r=await apiFetch(`/clerk/sections/${id}`,{method:'PUT',body:JSON.stringify(payload)});
   if(!r.ok){alert((await r.json()).detail);return;}
-  closeModal(); loadSections();
+  closeModal();
+  if($id('cm-sections')) loadCMSections();
 }
 async function deleteSection(id){
   if(!confirm('Delete this section and all student memberships?'))return;
   const r=await apiFetch(`/clerk/sections/${id}`,{method:'DELETE'});
   if(!r.ok){alert((await r.json()).detail);return;}
-  loadSections();
+  if($id('cm-sections')) loadCMSections();
 }
 async function openManageSectionStudents(sectionId, sectionName){
-  const r=await apiFetch(`/clerk/sections/${sectionId}/students`);
-  const d=await r.json();
-  const students=d.students||[];
-  const allStudentsR=await apiFetch('/admin/staff?role=student').then(r=>r.json());
-  const allStudents=(allStudentsR.staff||[]).filter(u=>u.role==='student'&&u.is_active);
+  const [secStudR, allStudR] = await Promise.all([
+    apiFetch(`/clerk/sections/${sectionId}/students`).then(r=>r.json()),
+    apiFetch('/clerk/students').then(r=>r.json()),
+  ]);
+  const students=secStudR.students||[];
+  const allStudents=allStudR.students||[];
   const enrolledIds=new Set(students.map(s=>s.student_id));
   openModal(`Students in ${sectionName}`,`
     <p style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">Enrolled: ${students.length}</p>
     ${students.length?`<div class="tbl-wrap" style="max-height:200px;overflow-y:auto"><table>
-      <thead><tr><th>Name</th><th>Email</th><th>Action</th></tr></thead>
-      <tbody>${students.map(s=>`<tr><td>${s.name}</td><td>${s.email}</td>
+      <thead><tr><th>Name</th><th>Email</th><th>Dept</th><th>Action</th></tr></thead>
+      <tbody>${students.map(s=>`<tr><td>${s.name}</td><td>${s.email}</td><td>${s.department||'—'}</td>
         <td><button class="btn btn-sm btn-danger" onclick="removeFromSection(${sectionId},${s.student_id})">Remove</button></td>
       </tr>`).join('')}</tbody></table></div>`:''
     }
@@ -1698,7 +1879,7 @@ async function openManageSectionStudents(sectionId, sectionName){
     <div class="form-field"><label>Add Student</label>
       <select id="sec-add-stud">
         <option value="">— Select student —</option>
-        ${allStudents.filter(u=>!enrolledIds.has(u.user_id)).map(u=>`<option value="${u.user_id}">${u.name} (${u.email})</option>`).join('')}
+        ${allStudents.filter(u=>!enrolledIds.has(u.user_id)).map(u=>`<option value="${u.user_id}">${u.name}${u.department?' ('+u.department+')':''} – ${u.email}</option>`).join('')}
       </select>
     </div>`,
     `<button class="btn btn-primary btn-sm" onclick="addToSection(${sectionId})">Add Student</button>
@@ -1710,13 +1891,11 @@ async function addToSection(sectionId){
   if(!sid){alert('Select a student.');return;}
   const r=await apiFetch(`/clerk/sections/${sectionId}/students`,{method:'POST',body:JSON.stringify({student_id:sid})});
   if(!r.ok){alert((await r.json()).detail);return;}
-  const sec=$id('rm-sections');
-  // Re-open the modal with fresh data
   closeModal();
   const locR=await apiFetch('/clerk/sections').then(r=>r.json());
   const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
   if(s) openManageSectionStudents(sectionId,s.name);
-  loadSections();
+  if($id('cm-sections')) loadCMSections();
 }
 async function removeFromSection(sectionId,studentId){
   if(!confirm('Remove student from section?'))return;
@@ -1726,7 +1905,7 @@ async function removeFromSection(sectionId,studentId){
   const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
   closeModal();
   if(s) openManageSectionStudents(sectionId,s.name);
-  loadSections();
+  if($id('cm-sections')) loadCMSections();
 }
 
 /* ── Degree Coordinator Panel ────────────────────────────────────────── */
@@ -1747,9 +1926,9 @@ PANES.dc_panel = async mc => {
   loadDCOverview();
 };
 function dcTab(btn,pane){
-  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dc-overview','dc-students','dc-schedule','dc-teachers','dc-enroll'].forEach(id=>$id(id).style.display='none');
+  ['dc-overview','dc-students','dc-schedule','dc-teachers','dc-enroll'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
   $id(pane).style.display='';
   if(pane==='dc-overview') loadDCOverview();
   if(pane==='dc-students') loadDCStudents();

@@ -101,6 +101,7 @@ def get_section_students(
                 "student_id": u.user_id,
                 "name": u.name,
                 "email": u.email,
+                "department": u.department,
                 "enrolled_at": str(ss.enrolled_at),
             })
     return {"students": result, "section_id": sid}
@@ -192,23 +193,42 @@ def get_section_teachers(
     db: Session = Depends(get_db),
     current_user: User = _dc_or_admin,
 ):
-    """List teachers who have courses assigned to the DC's section."""
+    """List teachers who have courses assigned to the DC's section (program/department)."""
     if current_user.role == "degree_coordinator":
         section = _get_dc_section(current_user, db)
         sec_name = section.name
+        program = section.program
     else:
         if not section_id:
             raise HTTPException(status_code=400, detail="section_id required.")
         sec = db.query(Section).filter(Section.section_id == section_id).first()
         sec_name = sec.name if sec else None
+        program = sec.program if sec else None
 
-    # Courses with matching section name
+    # Teachers by department match (program == department)
+    dept_teachers: dict[int, dict] = {}
+    if program:
+        dept_q = db.query(User).filter(
+            User.role == "teacher",
+            User.is_active.is_(True),
+            User.department == program,
+        ).all()
+        for t in dept_q:
+            dept_teachers[t.user_id] = {
+                "teacher_id": t.user_id,
+                "name": t.name,
+                "email": t.email,
+                "department": t.department,
+                "courses": [],
+            }
+
+    # Also include teachers with courses for this section name
     courses = db.query(Course).filter(
         Course.section == sec_name,
         Course.is_active.is_(True),
     ).all() if sec_name else []
 
-    teachers_map: dict[int, dict] = {}
+    teachers_map: dict[int, dict] = dict(dept_teachers)
     for c in courses:
         if c.teacher_id and c.teacher_id not in teachers_map:
             teacher = db.query(User).filter(User.user_id == c.teacher_id).first()
@@ -217,6 +237,7 @@ def get_section_teachers(
                     "teacher_id": teacher.user_id,
                     "name": teacher.name,
                     "email": teacher.email,
+                    "department": teacher.department,
                     "courses": [],
                 }
         if c.teacher_id and c.teacher_id in teachers_map:

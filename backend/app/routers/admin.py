@@ -69,6 +69,7 @@ def list_signup_requests(
                 "email": r.email,
                 "name": r.name,
                 "role_requested": r.role_requested,
+                "department": r.department,
                 "status": r.status,
                 "created_at": str(r.created_at),
             }
@@ -102,6 +103,7 @@ def approve_signup(
         name=req.name,
         password_hash=req.password_hash,
         role=req.role_requested,
+        department=req.department,
         is_active=True,
     )
     db.add(user)
@@ -149,6 +151,7 @@ def list_staff(
                 "name": u.name,
                 "email": u.email,
                 "role": u.role,
+                "department": u.department,
                 "is_active": u.is_active,
                 "created_at": str(u.created_at),
             }
@@ -173,6 +176,7 @@ def create_staff(
         name=payload.name,
         password_hash=hash_password(payload.password),
         role=payload.role,
+        department=payload.department,
         is_active=True,
     )
     db.add(user)
@@ -216,6 +220,8 @@ def update_staff(
         user.role = payload.role
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    if payload.department is not None:
+        user.department = payload.department
 
     db.commit()
     db.refresh(user)

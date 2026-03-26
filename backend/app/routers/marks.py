@@ -555,7 +555,7 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
     """Build a PDF result sheet using ReportLab."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import (
         Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
@@ -567,11 +567,14 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
 
     styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
+    hdr_style  = ParagraphStyle("hdr",  parent=styles["Normal"], fontSize=9, leading=11,
+                                 textColor=colors.white, fontName="Helvetica-Bold")
     elements = []
 
     # Title
     elements.append(Paragraph(
-        f"<b>PUCIT – Result Sheet</b>", styles["Title"]))
+        "<b>PUCIT – Result Sheet</b>", styles["Title"]))
     elements.append(Paragraph(
         f"Course: {course.code} – {course.name} | "
         f"Section: {course.section or '–'} | Semester: {course.semester or '–'}",
@@ -581,7 +584,7 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
 
     # Lock status row
     lock_status = " | ".join(
-        f"{cat}: {'🔒 Final' if locks.get(cat) else '✏️ Open'}"
+        f"{cat}: {'Final' if locks.get(cat) else 'Open'}"
         for cat in ("attendance", "quiz", "activity", "mid", "final")
     )
     elements.append(Paragraph(f"<i>Submission status — {lock_status}</i>", styles["Normal"]))
@@ -590,9 +593,12 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
     if not students_data:
         elements.append(Paragraph("No students enrolled.", styles["Normal"]))
     else:
-        # Group marks by student and category
-        col_headers = ["#", "Student", "Email",
+        # Use Paragraph for all header and data cells so text wraps properly
+        col_headers = [
+            Paragraph(h, hdr_style)
+            for h in ["#", "Student", "Email",
                        "Attendance", "Quiz(s)", "Activity(s)", "Mid", "Final"]
+        ]
         table_data = [col_headers]
 
         for idx, (student, marks) in enumerate(students_data, 1):
@@ -606,31 +612,30 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
                     by_cat[m.category].append(f"{m.title}: {obt}{tot}")
 
             row = [
-                str(idx),
-                student.name,
-                student.email,
-                "\n".join(by_cat["attendance"]) or "–",
-                "\n".join(by_cat["quiz"]) or "–",
-                "\n".join(by_cat["activity"]) or "–",
-                "\n".join(by_cat["mid"]) or "–",
-                "\n".join(by_cat["final"]) or "–",
+                Paragraph(str(idx), cell_style),
+                Paragraph(student.name, cell_style),
+                Paragraph(student.email, cell_style),
+                Paragraph("<br/>".join(by_cat["attendance"]) or "–", cell_style),
+                Paragraph("<br/>".join(by_cat["quiz"]) or "–", cell_style),
+                Paragraph("<br/>".join(by_cat["activity"]) or "–", cell_style),
+                Paragraph("<br/>".join(by_cat["mid"]) or "–", cell_style),
+                Paragraph("<br/>".join(by_cat["final"]) or "–", cell_style),
             ]
             table_data.append(row)
 
         col_widths = [1*cm, 4*cm, 5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm]
         t = Table(table_data, colWidths=col_widths, repeatRows=1)
+        alt = colors.HexColor("#EFF3FF")
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1565C0")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 9),
-            ("FONTSIZE", (0, 1), (-1, -1), 8),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#EFF3FF")]),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, alt]),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("WORDWRAP", (0, 0), (-1, -1), True),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ]))
         elements.append(t)
 

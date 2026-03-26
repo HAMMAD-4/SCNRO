@@ -369,6 +369,63 @@ def list_my_course_requests(
 VALID_PROGRAMS = {"IT", "SE", "CS", "DS", "AI"}
 
 
+@router.get("/teachers")
+def list_teachers(
+    department: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Return active teachers, optionally filtered by department."""
+    q = db.query(User).filter(User.role == "teacher", User.is_active.is_(True))
+    if department:
+        q = q.filter(User.department == department)
+    teachers = q.order_by(User.name).all()
+    return {
+        "teachers": [
+            {"user_id": t.user_id, "name": t.name, "email": t.email, "department": t.department}
+            for t in teachers
+        ]
+    }
+
+
+@router.get("/degree-coordinators")
+def list_degree_coordinators(
+    department: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Return active degree coordinators, optionally filtered by department."""
+    q = db.query(User).filter(User.role == "degree_coordinator", User.is_active.is_(True))
+    if department:
+        q = q.filter(User.department == department)
+    dcs = q.order_by(User.name).all()
+    return {
+        "coordinators": [
+            {"user_id": d.user_id, "name": d.name, "email": d.email, "department": d.department}
+            for d in dcs
+        ]
+    }
+
+
+@router.get("/students")
+def list_students(
+    department: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = _clerk_or_admin,
+):
+    """Return active students, optionally filtered by department."""
+    q = db.query(User).filter(User.role == "student", User.is_active.is_(True))
+    if department:
+        q = q.filter(User.department == department)
+    students = q.order_by(User.name).all()
+    return {
+        "students": [
+            {"user_id": s.user_id, "name": s.name, "email": s.email, "department": s.department}
+            for s in students
+        ]
+    }
+
+
 class SectionCreate(BaseModel):
     name: str
     program: str

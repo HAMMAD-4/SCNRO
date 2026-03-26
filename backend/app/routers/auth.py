@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -31,7 +33,8 @@ class SignupRequestCreate(BaseModel):
     email: str = Field(..., description="University email address")
     name: str = Field(..., min_length=2, max_length=255)
     password: str = Field(..., min_length=6)
-    role: str = Field(..., description="teacher | student | sac | head_clerk")
+    role: str = Field(..., description="teacher | student | sac | head_clerk | degree_coordinator")
+    department: Optional[str] = Field(None, description="IT | CS | SE | DS | AI")
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────
@@ -103,6 +106,7 @@ def signup_request(payload: SignupRequestCreate, db: Session = Depends(get_db)):
         name=payload.name,
         password_hash=hash_password(payload.password),
         role_requested=payload.role,
+        department=payload.department,
         status="pending",
     )
     db.add(req)
@@ -123,6 +127,7 @@ def me(current_user: User = Depends(get_current_user)):
         "name": current_user.name,
         "email": current_user.email,
         "role": current_user.role,
+        "department": current_user.department,
     }
 
 
