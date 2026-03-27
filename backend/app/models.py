@@ -329,3 +329,56 @@ class EnrollmentRequest(Base):
     student = relationship("User", foreign_keys=[student_id])
     course = relationship("Course")
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+# ── Attendance models ──────────────────────────────────────────────────────
+
+class DailyAttendance(Base):
+    """One attendance entry per student per course per calendar date."""
+
+    __tablename__ = "daily_attendance"
+
+    record_id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
+    # stored as YYYY-MM-DD string for portability across SQLite and PostgreSQL
+    date = Column(String(10), nullable=False)
+    # present | absent | late
+    status = Column(String(10), nullable=False)
+    marked_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    # Each student can have only one entry per course per date
+    __table_args__ = (UniqueConstraint("student_id", "course_id", "date"),)
+
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course")
+    marker = relationship("User", foreign_keys=[marked_by])
+
+
+class AttendanceFine(Base):
+    """Fine issued to a student whose attendance falls below the 75 % threshold.
+
+    One live fine record per (student, course).  The record is removed when
+    attendance recovers above the threshold; the status field tracks payment.
+    """
+
+    __tablename__ = "attendance_fines"
+
+    fine_id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.course_id"), nullable=False)
+    attendance_percentage = Column(DECIMAL(5, 2))
+    fine_amount = Column(DECIMAL(10, 2), default=500.00)
+    reason = Column(Text)
+    issued_at = Column(TIMESTAMP, server_default=func.now())
+    # pending | paid | waived
+    status = Column(String(20), default="pending")
+    issued_by = Column(Integer, ForeignKey("users.user_id"))
+
+    # Only one active fine record per student per course
+    __table_args__ = (UniqueConstraint("student_id", "course_id"),)
+
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course")
+    issuer = relationship("User", foreign_keys=[issued_by])

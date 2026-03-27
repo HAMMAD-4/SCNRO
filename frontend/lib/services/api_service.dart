@@ -88,6 +88,120 @@ class ApiService {
         .toList();
   }
 
+  // ── Attendance ───────────────────────────────────────────────────────────
+
+  /// Mark daily attendance for a batch of students in [courseId] on [date]
+  /// (format YYYY-MM-DD).  [entries] is a list of
+  /// `{'student_id': int, 'status': 'present'|'absent'|'late'}` maps.
+  Future<Map<String, dynamic>> markAttendance({
+    required String token,
+    required int courseId,
+    required String date,
+    required List<Map<String, dynamic>> entries,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/attendance/mark');
+    final response = await _client.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'course_id': courseId,
+        'date': date,
+        'entries': entries,
+      }),
+    );
+    _assertOk(response, expectedStatus: 201);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Fetch raw daily attendance records for a course.
+  Future<List<DailyAttendanceRecord>> getAttendanceRecords({
+    required String token,
+    required int courseId,
+    String? date,
+    int? studentId,
+  }) async {
+    final params = <String, String>{};
+    if (date != null) params['date'] = date;
+    if (studentId != null) params['student_id'] = '$studentId';
+    final uri = Uri.parse('$baseUrl/api/v1/attendance/$courseId/records')
+        .replace(queryParameters: params.isNotEmpty ? params : null);
+    final response = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _assertOk(response);
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['records'] as List)
+        .map((r) => DailyAttendanceRecord.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get attendance percentage summary (with fine/exam-eligibility flags).
+  Future<Map<String, dynamic>> getAttendanceSummary({
+    required String token,
+    required int courseId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/attendance/$courseId/summary');
+    final response = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _assertOk(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Check exam eligibility for a course.
+  Future<Map<String, dynamic>> getExamEligibility({
+    required String token,
+    required int courseId,
+  }) async {
+    final uri =
+        Uri.parse('$baseUrl/api/v1/attendance/exam-eligibility/$courseId');
+    final response = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _assertOk(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// List attendance fines visible to the current user.
+  Future<List<AttendanceFineRecord>> getAttendanceFines({
+    required String token,
+    int? courseId,
+  }) async {
+    final params = courseId != null
+        ? <String, String>{'course_id': '$courseId'}
+        : <String, String>{};
+    final uri = Uri.parse('$baseUrl/api/v1/attendance/fines')
+        .replace(queryParameters: params.isNotEmpty ? params : null);
+    final response = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _assertOk(response);
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['fines'] as List)
+        .map((f) => AttendanceFineRecord.fromJson(f as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Mark a fine as paid (admin only).
+  Future<void> markFinePaid({
+    required String token,
+    required int fineId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/attendance/fines/$fineId/pay');
+    final response = await _client.put(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _assertOk(response);
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   void _assertOk(http.Response response, {int expectedStatus = 200}) {

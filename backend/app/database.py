@@ -5,7 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import (
-    Base, Course, Enrollment, Faculty, Location, MarkRecord, Schedule, User,
+    AttendanceFine, Base, Course, DailyAttendance, Enrollment, Faculty,
+    Location, MarkRecord, Schedule, User,
 )
 
 DATABASE_URL = os.getenv(

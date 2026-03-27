@@ -25,6 +25,7 @@ from app.routers import admin as admin_router
 from app.routers import marks as marks_router
 from app.routers import clerk as clerk_router
 from app.routers import degree_coordinator as dc_router
+from app.routers import attendance as attendance_router
 
 
 @asynccontextmanager
@@ -64,6 +65,7 @@ app.include_router(admin_router.router)
 app.include_router(marks_router.router)
 app.include_router(clerk_router.router)
 app.include_router(dc_router.router)
+app.include_router(attendance_router.router)
 
 
 @app.get("/health", tags=["Health"])
