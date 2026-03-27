@@ -292,7 +292,7 @@ let _token = localStorage.getItem('scnro_token') || '';
 let _user  = (() => { try{ return JSON.parse(localStorage.getItem('scnro_user')||'null'); }catch(e){return null;} })();
 
 /* ═══════════════════════════════ TOAST ══════════════════════════════ */
-function showToast(msg, type='info', duration=10000) {
+function showToast(msg, type='info', duration=5000) {
   const tc = $id('toast-container');
   const el = document.createElement('div');
   const icons = {success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
@@ -457,14 +457,7 @@ function doLogout() {
   _token=''; _user=null;
   localStorage.removeItem('scnro_token');
   localStorage.removeItem('scnro_user');
-  document.documentElement.className='guest';
-  $id('screen-app').style.display='none';
-  $id('screen-login').style.display='flex';
-  $id('screen-signup').style.display='none';
-  // Clear login fields for security
-  $id('li-email').value='';
-  $id('li-pass').value='';
-  $id('login-msg').textContent='';
+  window.location.href = '/';
 }
 
 /* ═══════════════════════════════ NAV ════════════════════════════════ */
@@ -522,11 +515,8 @@ function bootApp() {
 
   buildNav();
 
-  // Apply portal settings (theme, name, logo)
-  if (_user.role === 'admin' || _user.role === 'teacher' || _user.role === 'head_clerk' ||
-      _user.role === 'degree_coordinator') {
-    loadAndApplySettings();
-  }
+  // Apply portal settings (theme, name, logo) for all users
+  loadAndApplySettings();
 
   // Pick the first pane visible for this role
   const first = NAV_ALL.find(n => !n.roles || n.roles.includes(_user.role));
@@ -540,6 +530,13 @@ const PANES = {};
 PANES.dashboard = async mc => {
   mc.innerHTML = `<h2>🏠 Dashboard</h2>
   <div class="stat-grid" id="dash-stats"><div class="stat-card"><div class="spinner"></div></div></div>
+  <div id="dash-charts" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1rem">
+      <div class="card"><div class="card-title">👥 Users by Role</div><canvas id="chart-users" width="280" height="180"></canvas></div>
+      <div class="card"><div class="card-title">📚 Academics</div><canvas id="chart-academics" width="280" height="180"></canvas></div>
+      <div class="card"><div class="card-title">🔍 Lost &amp; Found</div><canvas id="chart-lf" width="280" height="180"></canvas></div>
+    </div>
+  </div>
   <div class="card"><div class="card-title">📢 Welcome to SCNRO</div>
     <p style="font-size:.9rem;color:var(--muted)">Smart Campus Navigation &amp; Resource Optimizer for Punjab University College of Information Technology.</p>
   </div>
@@ -547,7 +544,7 @@ PANES.dashboard = async mc => {
   try {
     if (_user.role === 'admin') {
       const r = await apiFetch('/admin/dashboard-stats');
-      if (!r || !r.ok) throw new Error();
+      if (!r || !r.ok) throw new Error('Stats unavailable');
       const d = await r.json();
       $id('dash-stats').innerHTML = `
         <div class="stat-card"><div class="val">${d.users.total}</div><div class="lbl">Total Users</div></div>
@@ -562,6 +559,26 @@ PANES.dashboard = async mc => {
         <div class="stat-card"><div class="val">${d.academics.total_enrollments}</div><div class="lbl">Enrollments</div></div>
         <div class="stat-card"><div class="val" style="color:#f59e0b">${d.lost_found.open}</div><div class="lbl">L&F Open</div></div>
         <div class="stat-card"><div class="val" style="color:#6b7280">${d.lost_found.closed}</div><div class="lbl">L&F Closed</div></div>`;
+
+      // Draw charts
+      $id('dash-charts').style.display = '';
+      _drawBarChart('chart-users',
+        ['Students','Teachers','Clerical','DC','Others'],
+        [d.users.students, d.users.teachers, d.users.clerical, d.users.degree_coordinators,
+         Math.max(0, d.users.total - d.users.students - d.users.teachers - d.users.clerical - d.users.degree_coordinators)],
+        ['#1d4ed8','#6d28d9','#0891b2','#d97706','#6b7280']
+      );
+      _drawBarChart('chart-academics',
+        ['Courses','Sections','Enrollments'],
+        [d.academics.total_courses, d.academics.total_sections, d.academics.total_enrollments],
+        ['#006633','#22c55e','#86efac']
+      );
+      _drawBarChart('chart-lf',
+        ['Open','Closed'],
+        [d.lost_found.open, d.lost_found.closed],
+        ['#f59e0b','#6b7280']
+      );
+
       const p = d.pending_requests;
       $id('dash-extra').innerHTML = `
         <div class="card"><div class="card-title">⏳ Pending Requests</div>
@@ -606,40 +623,96 @@ PANES.dashboard = async mc => {
         <div class="stat-card"><div class="val" style="color:#f59e0b">${open}</div><div class="lbl">Open L&F Reports</div></div>`;
       $id('dash-extra').innerHTML = coursesHtml;
     }
-  } catch(e) { $id('dash-stats').innerHTML='<p class="alert alert-warn">Could not load stats.</p>'; }
+  } catch(e) {
+    $id('dash-stats').innerHTML='<div class="alert alert-warn">⚠️ Could not load dashboard stats. Please try refreshing the page.</div>';
+  }
 };
+
+/** Simple canvas bar chart renderer — no external library needed */
+function _drawBarChart(canvasId, labels, values, colors) {
+  const canvas = $id(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const PAD = {top:10, right:10, bottom:28, left:40};
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+  const max = Math.max(...values, 1);
+  const barW = Math.floor(chartW / (labels.length * 1.5));
+  const gap   = Math.floor(chartW / labels.length);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+
+  // Y-axis grid lines (4 lines)
+  ctx.fillStyle = '#9ca3af'; ctx.font = '10px Segoe UI, Arial, sans-serif';
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + chartH - (i / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.fillText(Math.round(max * i / 4), 2, y + 3);
+  }
+
+  // Bars
+  labels.forEach((lbl, i) => {
+    const barH = values[i] / max * chartH;
+    const x = PAD.left + i * gap + (gap - barW) / 2;
+    const y = PAD.top + chartH - barH;
+    ctx.fillStyle = colors[i] || '#006633';
+    ctx.fillRect(x, y, barW, barH);
+
+    // Value label on top of bar
+    ctx.fillStyle = '#374151'; ctx.font = 'bold 10px Segoe UI, Arial, sans-serif';
+    ctx.fillText(values[i], x + barW/2 - ctx.measureText(String(values[i])).width/2, y - 2);
+
+    // X-axis label
+    ctx.fillStyle = '#6b7280'; ctx.font = '9px Segoe UI, Arial, sans-serif';
+    const lblX = x + barW/2 - ctx.measureText(lbl).width/2;
+    ctx.fillText(lbl, lblX, H - 6);
+  });
+}
 
 /* ── Free Rooms ─────────────────────────────────────────────────────── */
 PANES.free_rooms = async mc => {
   mc.innerHTML = `<h2>🚪 Free Rooms</h2>
-  <div class="card">
-    <div class="form-row">
-      <div class="form-field"><label>Your Latitude</label><input id="u-lat" type="number" step="any" value="31.4826" aria-label="User latitude coordinate"/></div>
-      <div class="form-field"><label>Your Longitude</label><input id="u-lng" type="number" step="any" value="74.3036" aria-label="User longitude coordinate"/></div>
-      <div class="form-field"><label>Max Distance (m)</label><input id="u-dist" type="number" value="500"/></div>
-    </div>
-    <button class="btn btn-primary btn-sm" onclick="loadFreeRooms()">🔍 Find Free Rooms</button>
-  </div>
-  <div id="free-rooms-result"></div>`;
+  <div id="free-rooms-result"><div style="text-align:center;padding:2rem"><span class="spinner"></span> Loading…</div></div>`;
+  loadFreeRooms(mc);
 };
-async function loadFreeRooms() {
-  const lat  = $id('u-lat').value;
-  const lng  = $id('u-lng').value;
-  const dist = $id('u-dist').value;
-  const el   = $id('free-rooms-result');
-  el.innerHTML = '<span class="spinner"></span> Searching…';
+async function loadFreeRooms(mc) {
+  const el = $id('free-rooms-result') || mc;
   try {
-    const r = await apiFetch(`/resources/free-rooms?user_lat=${lat}&user_lng=${lng}&max_distance=${dist}`);
+    const r = await apiFetch('/resources/free-rooms');
+    if (!r || !r.ok) throw new Error('Failed to load');
     const d = await r.json();
-    const rooms = d.free_rooms || [];
-    if (!rooms.length) { el.innerHTML='<div class="alert alert-info">No free rooms found nearby.</div>'; return; }
-    el.innerHTML = `<div class="card"><div class="tbl-wrap"><table>
-      <thead><tr><th>Room</th><th>Category</th><th>Wing</th><th>Floor</th><th>Distance</th></tr></thead>
-      <tbody>${rooms.map(r=>`<tr>
-        <td>${r.name}</td><td>${r.category||'—'}</td><td>${r.wing_name||'—'}</td>
-        <td>${r.floor_level??'—'}</td><td>${r.distance_m!=null?r.distance_m.toFixed(0)+' m':'—'}</td>
-      </tr>`).join('')}</tbody></table></div></div>`;
-  } catch(e) { el.innerHTML='<div class="alert alert-danger">Error loading rooms.</div>'; }
+    const never   = d.never_scheduled || [];
+    const current = d.currently_free  || [];
+
+    function roomTable(rooms) {
+      if (!rooms.length) return '<p style="color:var(--muted);font-size:.85rem">None</p>';
+      return `<div class="tbl-wrap"><table>
+        <thead><tr><th>Room</th><th>Category</th><th>Wing</th><th>Floor</th></tr></thead>
+        <tbody>${rooms.map(r=>`<tr>
+          <td><b>${r.name}</b></td><td>${r.category||'—'}</td>
+          <td>${r.wing_name||'—'}</td><td>${r.floor_level??'—'}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    el.innerHTML = `
+      <div class="stat-grid" style="margin-bottom:.8rem">
+        <div class="stat-card"><div class="val" style="color:#22c55e">${never.length}</div><div class="lbl">Fully Unscheduled</div></div>
+        <div class="stat-card"><div class="val" style="color:#3b82f6">${current.length}</div><div class="lbl">Currently Free</div></div>
+        <div class="stat-card"><div class="val" style="color:var(--g)">${d.total_free||0}</div><div class="lbl">Total Free Now</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🟢 Fully Unscheduled Rooms <span style="font-weight:400;color:var(--muted);font-size:.82rem">(no class ever assigned)</span></div>
+        ${roomTable(never)}
+      </div>
+      <div class="card">
+        <div class="card-title">🔵 Currently Free Rooms <span style="font-weight:400;color:var(--muted);font-size:.82rem">(have schedule but free right now)</span></div>
+        ${roomTable(current)}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-danger">Error loading rooms: ${e.message}</div>`;
+  }
 }
 
 /* ── Navigate ───────────────────────────────────────────────────────── */
@@ -647,36 +720,78 @@ PANES.navigate = async mc => {
   mc.innerHTML = `<h2>🗺 Navigate</h2>
   <div class="card">
     <div class="form-row">
-      <div class="form-field"><label>From (Location ID)</label><input id="nav-from" type="number" placeholder="e.g. 1"/></div>
-      <div class="form-field"><label>To (Location ID)</label><input id="nav-to" type="number" placeholder="e.g. 5"/></div>
+      <div class="form-field"><label>From (Room / Location)</label>
+        <select id="nav-from" onchange="updateNavToOptions()"><option value="">— select room —</option></select>
+      </div>
+      <div class="form-field"><label>To (Room / Location)</label>
+        <select id="nav-to"><option value="">— select room —</option></select>
+      </div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="loadNavRoute()">Get Route</button>
+    <button class="btn btn-primary btn-sm" onclick="loadNavRoute()">🗺 Get Route</button>
   </div>
   <div id="nav-result"></div>
   <div class="card" id="locations-list-card">
     <div class="card-title">📍 All Locations</div>
     <div id="all-locs-body"><span class="spinner"></span></div>
   </div>`;
-  apiFetch('/resources/locations').then(r=>r.json()).then(d=>{
-    const locs = d.locations||[];
+
+  // Populate location dropdowns
+  const r = await apiFetch('/resources/locations');
+  if (r && r.ok) {
+    const d = await r.json();
+    _navLocations = d.locations || [];
+    _populateNavDropdowns(_navLocations, null);
     $id('all-locs-body').innerHTML = `<div class="tbl-wrap"><table>
       <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Wing</th><th>Floor</th><th>Status</th></tr></thead>
-      <tbody>${locs.map(l=>`<tr>
+      <tbody>${_navLocations.map(l=>`<tr>
         <td>${l.location_id}</td><td>${l.name}</td><td>${l.category||'—'}</td>
         <td>${l.wing_name||'—'}</td><td>${l.floor_level??'—'}</td>
         <td><span class="avail-dot ${l.is_active?'on':'off'}"></span>${l.is_active?'Available':'Unavailable'}</td>
       </tr>`).join('')}</tbody></table></div>`;
-  });
+  }
 };
+
+let _navLocations = [];
+function _populateNavDropdowns(locs, excludeId) {
+  const fromSel = $id('nav-from');
+  const toSel   = $id('nav-to');
+  if (!fromSel || !toSel) return;
+  const fromVal = fromSel.value;
+  toSel.innerHTML = '<option value="">— select room —</option>';
+  locs.forEach(l => {
+    if (String(l.location_id) !== String(excludeId)) {
+      const o = document.createElement('option');
+      o.value = l.location_id;
+      o.textContent = `${l.name}${l.category?' ('+l.category+')':''}`;
+      toSel.appendChild(o);
+    }
+  });
+  if (fromSel.options.length <= 1) {
+    fromSel.innerHTML = '<option value="">— select room —</option>';
+    locs.forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.location_id;
+      o.textContent = `${l.name}${l.category?' ('+l.category+')':''}`;
+      fromSel.appendChild(o);
+    });
+    fromSel.value = fromVal;
+  }
+}
+function updateNavToOptions() {
+  const fromId = $id('nav-from')?.value;
+  _populateNavDropdowns(_navLocations, fromId || null);
+}
+
 async function loadNavRoute() {
   const from = $id('nav-from').value;
   const to   = $id('nav-to').value;
   const el   = $id('nav-result');
-  if (!from||!to) { el.innerHTML='<div class="alert alert-warn">Enter both IDs.</div>'; return; }
+  if (!from||!to) { el.innerHTML='<div class="alert alert-warn">Select both From and To rooms.</div>'; return; }
+  if (from===to)  { el.innerHTML='<div class="alert alert-warn">From and To must be different rooms.</div>'; return; }
   el.innerHTML='<span class="spinner"></span>';
   const r = await apiFetch(`/navigate?from_id=${from}&to_id=${to}`);
   const d = await r.json();
-  if (!r.ok) { el.innerHTML=`<div class="alert alert-danger">${d.detail||'Not found.'}</div>`; return; }
+  if (!r.ok) { el.innerHTML=`<div class="alert alert-danger">${d.detail||'Route not found.'}</div>`; return; }
   const steps = d.path||[];
   el.innerHTML=`<div class="card"><b>Route (${steps.length} steps):</b><ol style="margin-top:.5rem;padding-left:1.3rem">
     ${steps.map(s=>`<li style="padding:.2rem 0">${s.name} <span class="badge badge-grey">${s.category||''}</span></li>`).join('')}
@@ -1335,6 +1450,15 @@ async function resetAllData(){
 /* ── Marks Management (Teacher & Admin) ─────────────────────────────── */
 PANES.marks_mgmt = async mc => {
   mc.innerHTML=`<h2>📊 Marks Management</h2>
+  <div class="card" style="margin-bottom:.5rem">
+    <div style="font-size:.82rem;color:var(--muted)">
+      <b>Grading weights:</b>
+      <span class="badge badge-blue" style="margin-left:.4rem">Sessionals 25%</span>
+      <span class="badge badge-orange" style="margin-left:.3rem">Mid 35%</span>
+      <span class="badge badge-green" style="margin-left:.3rem">Final 40%</span>
+      &nbsp;—&nbsp; Sessionals = Attendance + Quiz + Activity
+    </div>
+  </div>
   <div class="card" id="mgt-courses-card">
     <div class="card-title">Select Course</div>
     <div id="mgt-course-list"><span class="spinner"></span></div>
@@ -1361,48 +1485,140 @@ async function loadCourseMarks(courseId, code, name) {
   const students = studR.students||[];
   const allMarks = marksR.marks||[];
   const locks    = marksR.locks||{};
-  const CATS = ['attendance','quiz','activity','mid','final'];
+
+  // Tab groups: Sessionals (25%), Mid (35%), Final (40%)
+  const TAB_GROUPS = [
+    {id:'sessionals', label:'Sessionals (25%)', cats:['attendance','quiz','activity'], weight:0.25},
+    {id:'mid',        label:'Mid (35%)',         cats:['mid'],                          weight:0.35},
+    {id:'final',      label:'Final (40%)',        cats:['final'],                        weight:0.40},
+  ];
+
+  /** Calculate weighted score for a student */
+  function calcWeighted(student) {
+    let total = 0;
+    for (const grp of TAB_GROUPS) {
+      let grpObt = 0, grpTot = 0;
+      for (const cat of grp.cats) {
+        const catMarks = allMarks.filter(m=>m.category===cat);
+        // Find max total_marks seen in this category (set by teacher)
+        const maxTot = catMarks.reduce((acc, m)=> m.total_marks ? Math.max(acc, m.total_marks) : acc, 0);
+        const studentMarks = catMarks.filter(m=>m.student_id===student.student_id);
+        const obtSum = studentMarks.reduce((acc, m)=> acc + (m.marks_obtained||0), 0);
+        grpObt += obtSum;
+        grpTot += maxTot;
+      }
+      if (grpTot > 0) {
+        total += (grpObt / grpTot) * grp.weight * 100;
+      }
+    }
+    return total;
+  }
 
   function renderCourseDetail() {
     let html = `<div class="card">
       <div class="card-title">📋 ${code} – ${name}</div>
       <div class="tab-bar" id="cat-tabs">
-        ${CATS.map((c,i)=>`<button class="tab-btn ${i===0?'active':''}" onclick="switchCat(this,'${c}')">${c.charAt(0).toUpperCase()+c.slice(1)}</button>`).join('')}
+        ${TAB_GROUPS.map((g,i)=>`<button class="tab-btn ${i===0?'active':''}" onclick="switchCatGroup(this,'grp-${g.id}')">${g.label}</button>`).join('')}
+        <button class="tab-btn" onclick="switchCatGroup(this,'grp-summary')">📊 Summary</button>
       </div>`;
-    CATS.forEach((cat,i)=>{
-      const isLocked = !!locks[cat];
-      const catMarks = allMarks.filter(m=>m.category===cat);
-      html += `<div id="cat-pane-${cat}" style="${i>0?'display:none':''}">
-        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem;flex-wrap:wrap">
-          ${isLocked
-            ? `<span class="badge badge-gold">🔒 Finalized</span><button class="btn btn-sm btn-ghost" onclick="openMCRModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">📩 Request Change</button>`
-            : `<button class="btn btn-sm btn-accent" onclick="openAddMarkModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">➕ Add Mark</button>
-               <button class="btn btn-sm btn-primary" onclick="finalizeCat(${courseId},'${cat}')">🔒 Finalize</button>`
-          }
-          ${_user.role==='teacher'||_user.role==='admin'?`
-            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>
-            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'mid')">📄 Mid Only</button>
-            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'final')">📄 Final Only</button>`:''}
-        </div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Student</th><th>Title</th><th>Obtained</th><th>Total</th>${isLocked?'':'<th>Actions</th>'}</tr></thead>
-          <tbody>
-            ${students.map(s=>{
-              const m = catMarks.filter(x=>x.student_id===s.student_id);
-              if(!m.length) return `<tr><td>${s.name}</td><td colspan="3" style="color:var(--muted)">Not uploaded</td>${isLocked?'':'<td></td>'}</tr>`;
-              return m.map(mk=>`<tr>
-                <td>${s.name}</td><td>${mk.title}</td>
-                <td>${mk.marks_obtained??'—'}</td><td>${mk.total_marks??'—'}</td>
-                ${isLocked?'':`<td>
-                  <button class="btn btn-sm btn-ghost" onclick="openEditMarkModal(${mk.record_id},'${escHtml(mk.title)}',${mk.marks_obtained??''},${mk.total_marks??''})">Edit</button>
-                  <button class="btn btn-sm btn-danger" onclick="deleteMark(${mk.record_id},${courseId},'${code}','${name}')">Del</button>
-                </td>`}
-              </tr>`).join('');
-            }).join('')}
-          </tbody>
-        </table></div>
+
+    // Render each group's pane
+    TAB_GROUPS.forEach((grp, gi) => {
+      const isGroupLocked = grp.cats.every(cat => !!locks[cat]);
+      html += `<div id="grp-${grp.id}" style="${gi>0?'display:none':''}">`;
+
+      grp.cats.forEach(cat => {
+        const isLocked = !!locks[cat];
+        const catMarks = allMarks.filter(m=>m.category===cat);
+        html += `<div style="margin-bottom:1rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
+            <b style="text-transform:capitalize">${cat}</b>
+            ${isLocked ? `<span class="badge badge-gold">🔒 Finalized</span>
+              <button class="btn btn-sm btn-ghost" onclick="openMCRModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">📩 Request Change</button>`
+            : `<button class="btn btn-sm btn-accent" onclick="openAddMarkModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">➕ Add</button>
+               <button class="btn btn-sm btn-primary" onclick="finalizeCat(${courseId},'${cat}')">🔒 Finalize</button>`}
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Student</th><th>Title</th><th>Obtained</th><th>Total</th>${isLocked?'':'<th>Actions</th>'}</tr></thead>
+            <tbody>
+              ${students.map(s=>{
+                const m = catMarks.filter(x=>x.student_id===s.student_id);
+                if(!m.length) return `<tr><td>${s.name}</td><td colspan="3" style="color:var(--muted)">Not entered — counts as 0</td>${isLocked?'':'<td></td>'}</tr>`;
+                return m.map(mk=>`<tr>
+                  <td>${s.name}</td><td>${mk.title}</td>
+                  <td>${mk.marks_obtained??'—'}</td><td>${mk.total_marks??'—'}</td>
+                  ${isLocked?'':`<td>
+                    <button class="btn btn-sm btn-ghost" onclick="openEditMarkModal(${mk.record_id},'${escHtml(mk.title)}',${mk.marks_obtained??''},${mk.total_marks??''})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteMark(${mk.record_id},${courseId},'${code}','${name}')">Del</button>
+                  </td>`}
+                </tr>`).join('');
+              }).join('')}
+            </tbody>
+          </table></div>
+        </div>`;
+      });
+
+      // PDF buttons per group
+      html += `<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">
+        ${_user.role==='teacher'||_user.role==='admin' ? grp.cats.map(cat=>
+          `<button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'${cat}')">📄 ${cat.charAt(0).toUpperCase()+cat.slice(1)} PDF</button>`
+        ).join('') : ''}
+        ${_user.role==='teacher'||_user.role==='admin' ? `<button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>` : ''}
       </div>`;
+      html += '</div>';
     });
+
+    // Summary pane
+    html += `<div id="grp-summary" style="display:none">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+        ${_user.role==='teacher'||_user.role==='admin'?`
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'mid')">📄 Mid PDF</button>
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'final')">📄 Final PDF</button>
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>`:''}
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Student</th><th>Sessionals (25%)</th><th>Mid (35%)</th><th>Final (40%)</th><th>Total %</th><th>Grade</th></tr></thead>
+        <tbody>
+          ${students.map(s => {
+            const wt = calcWeighted(s);
+            let grade = 'F';
+            if (wt >= 90) grade = 'A+';
+            else if (wt >= 85) grade = 'A';
+            else if (wt >= 80) grade = 'A-';
+            else if (wt >= 75) grade = 'B+';
+            else if (wt >= 70) grade = 'B';
+            else if (wt >= 65) grade = 'B-';
+            else if (wt >= 60) grade = 'C+';
+            else if (wt >= 55) grade = 'C';
+            else if (wt >= 50) grade = 'D';
+            const gradeClass = wt>=60?'badge-green':wt>=50?'badge-orange':'badge-red';
+
+            // Per-group contribution
+            const grpContribs = TAB_GROUPS.map(grp => {
+              let obt=0, tot=0;
+              for(const cat of grp.cats){
+                const catMarks=allMarks.filter(m=>m.category===cat);
+                const maxT=catMarks.reduce((a,m)=>m.total_marks?Math.max(a,m.total_marks):a,0);
+                const sMarks=catMarks.filter(m=>m.student_id===s.student_id);
+                obt+=sMarks.reduce((a,m)=>a+(m.marks_obtained||0),0);
+                tot+=maxT;
+              }
+              return tot>0 ? `${obt.toFixed(1)}/${tot.toFixed(1)} (${(obt/tot*grp.weight*100).toFixed(1)}pts)` : '—';
+            });
+
+            return `<tr>
+              <td>${s.name}</td>
+              <td>${grpContribs[0]}</td>
+              <td>${grpContribs[1]}</td>
+              <td>${grpContribs[2]}</td>
+              <td><b>${wt.toFixed(1)}%</b></td>
+              <td>${badge(grade, gradeClass)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
     html += '</div>';
     det.innerHTML = html;
   }
@@ -1412,12 +1628,11 @@ async function loadCourseMarks(courseId, code, name) {
   det._reload = () => loadCourseMarks(courseId, code, name);
 }
 
-function switchCat(btn,cat){
+function switchCatGroup(btn, groupId) {
   btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['attendance','quiz','activity','mid','final'].forEach(c=>{
-    const el=$id('cat-pane-'+c);
-    if(el) el.style.display = c===cat?'':'none';
+  document.querySelectorAll('[id^="grp-"]').forEach(el => {
+    el.style.display = el.id === groupId ? '' : 'none';
   });
 }
 
@@ -1488,15 +1703,28 @@ async function finalizeCat(courseId,cat){
 async function downloadPDF(courseId, category){
   const token=_token;
   const catParam = category ? `?category=${category}` : '';
-  fetch(`${API}/courses/${courseId}/report.pdf${catParam}`,{headers:{'Authorization':'Bearer '+token}})
-    .then(r=>{if(!r.ok)throw new Error('PDF error '+r.status);return r.blob();})
-    .then(blob=>{
-      const url=URL.createObjectURL(blob);
-      const link=document.createElement('a');
-      const suffix = category ? `_${category}` : '';
-      link.href=url; link.download=`course_${courseId}${suffix}_result.pdf`;
-      link.click(); URL.revokeObjectURL(url);
-    }).catch(e=>showToastError('PDF download failed: '+e.message));
+  try {
+    const r = await fetch(`${API}/courses/${courseId}/report.pdf${catParam}`,{headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok){
+      let msg = 'PDF error '+r.status;
+      try { const e=await r.json(); msg=e.detail||msg; } catch(_){}
+      showToastError('PDF download failed: '+msg);
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const suffix = category ? `_${category}` : '';
+    link.href = url;
+    link.download = `course_${courseId}${suffix}_result.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToastSuccess('PDF download started.');
+  } catch(e) {
+    showToastError('PDF download failed: '+e.message);
+  }
 }
 
 function openMCRModal(courseId, cat, students){

@@ -15,6 +15,9 @@ from app.models import ItemLostFound, User
 
 router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
 
+# Max size for a closure photo stored as a base64 data URL (~5 MB raw → ~7 MB encoded)
+_MAX_CLOSURE_PHOTO_BYTES = 7_000_000
+
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -152,7 +155,7 @@ def close_item(
             detail="A valid live webcam photo (data URL) is required to close this item.",
         )
     # Rough size check: base64 data URL should not exceed ~5 MB
-    if len(payload.closure_photo) > 7_000_000:
+    if len(payload.closure_photo) > _MAX_CLOSURE_PHOTO_BYTES:
         raise HTTPException(
             status_code=400,
             detail="Closure photo is too large (max ~5 MB).",

@@ -642,15 +642,21 @@ def _build_pdf(course, teacher, students_data: list, locks: dict, category: Opti
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
+    from reportlab.lib.units import cm, pt
     from reportlab.platypus import (
         Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
     )
 
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
-                            leftMargin=1.5*cm, rightMargin=1.5*cm,
-                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    LEFT = RIGHT = TOP = BOTTOM = 1.5 * cm
+    PAGE_W, PAGE_H = landscape(A4)
+    AVAILABLE_W = PAGE_W - LEFT - RIGHT  # usable width in points
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=LEFT, rightMargin=RIGHT,
+        topMargin=TOP, bottomMargin=BOTTOM,
+    )
 
     styles = getSampleStyleSheet()
     cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
@@ -666,13 +672,13 @@ def _build_pdf(course, teacher, students_data: list, locks: dict, category: Opti
     elements.append(Paragraph("Punjab University College of Information Technology (PUCIT)", title_style))
     elements.append(Paragraph("University of the Punjab, Lahore, Pakistan", sub_style))
     elements.append(Paragraph("Canal Bank Road, Lahore – 54590 | www.pucit.edu.pk", sub_style))
-    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Spacer(1, 0.3 * cm))
 
-    # Divider line via a thin table
-    divider = Table([[""]], colWidths=[doc.width], rowHeights=[2])
+    # Divider line
+    divider = Table([[""]], colWidths=[AVAILABLE_W], rowHeights=[2 * pt])
     divider.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#006633"))]))
     elements.append(divider)
-    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Spacer(1, 0.3 * cm))
 
     # Report title
     report_title = f"Result Gazette — {category.upper() if category else 'All Categories'}"
@@ -687,31 +693,35 @@ def _build_pdf(course, teacher, students_data: list, locks: dict, category: Opti
         f"Teacher: <b>{teacher_name}</b>",
         styles["Normal"],
     ))
-    elements.append(Spacer(1, 0.4*cm))
+    elements.append(Spacer(1, 0.4 * cm))
 
     # Lock status row
     if category:
         locked = locks.get(category, False)
-        lock_status = f"{category}: {'Finalized ✓' if locked else 'Open (not yet finalized)'}"
+        lock_status = f"{category}: {'Finalized' if locked else 'Open (not yet finalized)'}"
     else:
         lock_status = " | ".join(
-            f"{cat}: {'Final' if locks.get(cat) else 'Open'}"
+            f"{cat}: {'Finalized' if locks.get(cat) else 'Open'}"
             for cat in ("attendance", "quiz", "activity", "mid", "final")
         )
     elements.append(Paragraph(f"<i>Status — {lock_status}</i>", styles["Normal"]))
-    elements.append(Spacer(1, 0.4*cm))
+    elements.append(Spacer(1, 0.4 * cm))
 
     if not students_data:
         elements.append(Paragraph("No students enrolled in this course.", styles["Normal"]))
     else:
-        # Determine columns: if filtering by category, show just that category
+        # Determine columns
         if category:
             cat_list = [category]
             col_headers = [
                 Paragraph(h, hdr_style)
                 for h in ["#", "Student", "Email", category.title()]
             ]
-            col_widths = [1*cm, 5*cm, 6*cm, 8*cm]
+            # Proportional widths that sum to AVAILABLE_W
+            col_widths = [
+                0.04 * AVAILABLE_W, 0.22 * AVAILABLE_W,
+                0.26 * AVAILABLE_W, 0.48 * AVAILABLE_W,
+            ]
         else:
             cat_list = ["attendance", "quiz", "activity", "mid", "final"]
             col_headers = [
@@ -719,7 +729,11 @@ def _build_pdf(course, teacher, students_data: list, locks: dict, category: Opti
                 for h in ["#", "Student", "Email",
                            "Attendance", "Quiz(s)", "Activity(s)", "Mid", "Final"]
             ]
-            col_widths = [1*cm, 4*cm, 5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm]
+            col_widths = [
+                0.04 * AVAILABLE_W, 0.16 * AVAILABLE_W, 0.20 * AVAILABLE_W,
+                0.12 * AVAILABLE_W, 0.12 * AVAILABLE_W, 0.12 * AVAILABLE_W,
+                0.12 * AVAILABLE_W, 0.12 * AVAILABLE_W,
+            ]
 
         table_data = [col_headers]
 
@@ -740,13 +754,12 @@ def _build_pdf(course, teacher, students_data: list, locks: dict, category: Opti
                 row_base.append(Paragraph("<br/>".join(by_cat[cat]) or "—", cell_style))
             table_data.append(row_base)
 
-        t = Table(table_data, colWidths=col_widths, repeatRows=1)
         alt = colors.HexColor("#EFF3FF")
+        t = Table(table_data, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#006633")),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.white),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, alt]),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
