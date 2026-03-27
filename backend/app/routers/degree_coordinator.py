@@ -263,6 +263,24 @@ def get_teacher_students(
     The DC can query this for any teacher associated with their section.
     Students from outside the DC's own department are included.
     """
+    # Verify teacher is associated with DC's section (for DC role)
+    if current_user.role == "degree_coordinator":
+        section = _get_dc_section(current_user, db)
+        # Teacher must have at least one course in this section name
+        has_course_in_section = db.query(Course).filter(
+            Course.teacher_id == teacher_id,
+            Course.section == section.name,
+            Course.is_active.is_(True),
+        ).first()
+        # Also allow teachers from the same department
+        teacher_obj = db.query(User).filter(User.user_id == teacher_id).first()
+        same_dept = teacher_obj and teacher_obj.department == section.program
+        if not has_course_in_section and not same_dept:
+            raise HTTPException(
+                status_code=403,
+                detail="This teacher is not associated with your section.",
+            )
+
     # Find all active courses for this teacher
     courses = db.query(Course).filter(
         Course.teacher_id == teacher_id,

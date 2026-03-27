@@ -332,6 +332,7 @@ def get_my_marks(
     }
 
 
+@router.post("/marks", status_code=201)
 def create_mark(
     payload: MarkRecordCreate,
     db: Session = Depends(get_db),

@@ -151,6 +151,12 @@ def close_item(
             status_code=400,
             detail="A valid live webcam photo (data URL) is required to close this item.",
         )
+    # Rough size check: base64 data URL should not exceed ~5 MB
+    if len(payload.closure_photo) > 7_000_000:
+        raise HTTPException(
+            status_code=400,
+            detail="Closure photo is too large (max ~5 MB).",
+        )
     item.status = "Closed"
     item.closed_by = current_user.user_id
     item.closure_photo = payload.closure_photo
