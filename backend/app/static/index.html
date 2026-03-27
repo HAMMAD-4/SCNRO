@@ -561,23 +561,25 @@ PANES.dashboard = async mc => {
         <div class="stat-card"><div class="val" style="color:#6b7280">${d.lost_found.closed}</div><div class="lbl">L&F Closed</div></div>`;
 
       // Draw charts
-      $id('dash-charts').style.display = '';
-      _drawBarChart('chart-users',
-        ['Students','Teachers','Clerical','DC','Others'],
-        [d.users.students, d.users.teachers, d.users.clerical, d.users.degree_coordinators,
-         Math.max(0, d.users.total - d.users.students - d.users.teachers - d.users.clerical - d.users.degree_coordinators)],
-        ['#1d4ed8','#6d28d9','#0891b2','#d97706','#6b7280']
-      );
-      _drawBarChart('chart-academics',
-        ['Courses','Sections','Enrollments'],
-        [d.academics.total_courses, d.academics.total_sections, d.academics.total_enrollments],
-        ['#006633','#22c55e','#86efac']
-      );
-      _drawBarChart('chart-lf',
-        ['Open','Closed'],
-        [d.lost_found.open, d.lost_found.closed],
-        ['#f59e0b','#6b7280']
-      );
+      try {
+        $id('dash-charts').style.display = '';
+        _drawBarChart('chart-users',
+          ['Students','Teachers','Clerical','DC','Others'],
+          [d.users.students, d.users.teachers, d.users.clerical, d.users.degree_coordinators,
+           Math.max(0, d.users.total - d.users.students - d.users.teachers - d.users.clerical - d.users.degree_coordinators)],
+          ['#1d4ed8','#6d28d9','#0891b2','#d97706','#6b7280']
+        );
+        _drawBarChart('chart-academics',
+          ['Courses','Sections','Enrollments'],
+          [d.academics.total_courses, d.academics.total_sections, d.academics.total_enrollments],
+          ['#006633','#22c55e','#86efac']
+        );
+        _drawBarChart('chart-lf',
+          ['Open','Closed'],
+          [d.lost_found.open, d.lost_found.closed],
+          ['#f59e0b','#6b7280']
+        );
+      } catch(_chartErr) { /* charts are best-effort; stats still visible above */ }
 
       const p = d.pending_requests;
       $id('dash-extra').innerHTML = `
@@ -633,6 +635,7 @@ function _drawBarChart(canvasId, labels, values, colors) {
   const canvas = $id(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  if (!ctx) return;
   const W = canvas.width, H = canvas.height;
   const PAD = {top:10, right:10, bottom:28, left:40};
   const chartW = W - PAD.left - PAD.right;
