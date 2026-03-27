@@ -44,6 +44,36 @@ class MarkRecordUpdate(BaseModel):
 
 # ── Course endpoints ─────────────────────────────────────────────────────────
 
+@router.get("/courses/available")
+def list_available_courses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all active courses available for enrollment (any student, any department)."""
+    courses = db.query(Course).filter(Course.is_active.is_(True)).all()
+    result = []
+    for c in courses:
+        teacher = db.query(User).filter(User.user_id == c.teacher_id).first()
+        # Check if student is already enrolled
+        already_enrolled = False
+        if current_user.role == "student":
+            already_enrolled = db.query(Enrollment).filter(
+                Enrollment.student_id == current_user.user_id,
+                Enrollment.course_id == c.course_id,
+            ).first() is not None
+        result.append({
+            "course_id": c.course_id,
+            "code": c.code,
+            "name": c.name,
+            "section": c.section,
+            "semester": c.semester,
+            "teacher_name": teacher.name if teacher else None,
+            "teacher_department": teacher.department if teacher else None,
+            "already_enrolled": already_enrolled,
+        })
+    return {"courses": result}
+
+
 @router.get("/courses")
 def list_courses(
     db: Session = Depends(get_db),
@@ -76,6 +106,7 @@ def list_courses(
             "section": c.section,
             "semester": c.semester,
             "teacher_name": teacher.name if teacher else None,
+            "teacher_id": c.teacher_id,
         })
     return {"courses": result}
 
@@ -260,7 +291,47 @@ def get_marks(
     }
 
 
-@router.post("/marks", status_code=201)
+@router.get("/courses/{course_id}/locks")
+def get_course_locks(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the lock status for all mark categories of a course."""
+    locks = {
+        lock.category: lock.is_locked
+        for lock in db.query(CategoryLock).filter(
+            CategoryLock.course_id == course_id
+        ).all()
+    }
+    return {"course_id": course_id, "locks": locks}
+
+
+@router.get("/marks/my")
+def get_my_marks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("student")),
+):
+    """Return all mark records for the currently signed-in student across all enrolled courses."""
+    records = db.query(MarkRecord).filter(
+        MarkRecord.student_id == current_user.user_id
+    ).order_by(MarkRecord.course_id, MarkRecord.category, MarkRecord.title).all()
+    return {
+        "marks": [
+            {
+                "record_id": r.record_id,
+                "course_id": r.course_id,
+                "student_id": r.student_id,
+                "category": r.category,
+                "title": r.title,
+                "marks_obtained": float(r.marks_obtained) if r.marks_obtained is not None else None,
+                "total_marks": float(r.total_marks) if r.total_marks is not None else None,
+            }
+            for r in records
+        ]
+    }
+
+
 def create_mark(
     payload: MarkRecordCreate,
     db: Session = Depends(get_db),
@@ -357,7 +428,7 @@ def delete_mark(
 
 # ── Final Submission (lock) ──────────────────────────────────────────────────
 
-@router.post("/courses/{course_id}/finalize")
+@router.post("/courses/{course_id}/finalize/{category}")
 def finalize_category(
     course_id: int,
     category: str,
@@ -509,30 +580,43 @@ def list_mark_change_requests(
 @router.get("/courses/{course_id}/report.pdf")
 def download_pdf_report(
     course_id: int,
+    category: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher", "admin")),
 ):
-    """Generate and return a PDF result sheet for the course."""
+    """Generate and return a PDF result sheet for the course.
+
+    Optionally filter by a single category (e.g. ?category=mid or ?category=final).
+    Works even when no marks have been entered yet.
+    """
     course = db.query(Course).filter(Course.course_id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found.")
     if current_user.role == "teacher" and course.teacher_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not your course.")
 
+    if category and category not in VALID_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
+
     # Collect all enrolled students and their marks
     enrollments = db.query(Enrollment).filter(
         Enrollment.course_id == course_id
     ).all()
+
+    teacher = db.query(User).filter(User.user_id == course.teacher_id).first()
 
     students_data = []
     for enr in enrollments:
         student = db.query(User).filter(User.user_id == enr.student_id).first()
         if not student:
             continue
-        marks = db.query(MarkRecord).filter(
+        q = db.query(MarkRecord).filter(
             MarkRecord.course_id == course_id,
             MarkRecord.student_id == enr.student_id,
-        ).order_by(MarkRecord.category, MarkRecord.title).all()
+        )
+        if category:
+            q = q.filter(MarkRecord.category == category)
+        marks = q.order_by(MarkRecord.category, MarkRecord.title).all()
         students_data.append((student, marks))
 
     locks = {
@@ -542,8 +626,9 @@ def download_pdf_report(
         ).all()
     }
 
-    pdf_bytes = _build_pdf(course, students_data, locks)
-    filename = f"{course.code}_{course.section or 'ALL'}_result.pdf"
+    pdf_bytes = _build_pdf(course, teacher, students_data, locks, category)
+    cat_suffix = f"_{category}" if category else ""
+    filename = f"{course.code}_{course.section or 'ALL'}{cat_suffix}_result.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -551,7 +636,7 @@ def download_pdf_report(
     )
 
 
-def _build_pdf(course, students_data: list, locks: dict) -> bytes:
+def _build_pdf(course, teacher, students_data: list, locks: dict, category: Optional[str] = None) -> bytes:
     """Build a PDF result sheet using ReportLab."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -570,64 +655,94 @@ def _build_pdf(course, students_data: list, locks: dict) -> bytes:
     cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
     hdr_style  = ParagraphStyle("hdr",  parent=styles["Normal"], fontSize=9, leading=11,
                                  textColor=colors.white, fontName="Helvetica-Bold")
+    title_style = ParagraphStyle("uni_title", parent=styles["Normal"], fontSize=14,
+                                  fontName="Helvetica-Bold", alignment=1, leading=18)
+    sub_style   = ParagraphStyle("uni_sub",   parent=styles["Normal"], fontSize=10,
+                                  alignment=1, leading=13, textColor=colors.HexColor("#444444"))
     elements = []
 
-    # Title
+    # University / campus header
+    elements.append(Paragraph("Punjab University College of Information Technology (PUCIT)", title_style))
+    elements.append(Paragraph("University of the Punjab, Lahore, Pakistan", sub_style))
+    elements.append(Paragraph("Canal Bank Road, Lahore – 54590 | www.pucit.edu.pk", sub_style))
+    elements.append(Spacer(1, 0.3*cm))
+
+    # Divider line via a thin table
+    divider = Table([[""]], colWidths=[doc.width], rowHeights=[2])
+    divider.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#006633"))]))
+    elements.append(divider)
+    elements.append(Spacer(1, 0.3*cm))
+
+    # Report title
+    report_title = f"Result Gazette — {category.upper() if category else 'All Categories'}"
+    elements.append(Paragraph(f"<b>{report_title}</b>", styles["Title"]))
+
+    # Course info
+    teacher_name = teacher.name if teacher else "—"
     elements.append(Paragraph(
-        "<b>PUCIT – Result Sheet</b>", styles["Title"]))
-    elements.append(Paragraph(
-        f"Course: {course.code} – {course.name} | "
-        f"Section: {course.section or '–'} | Semester: {course.semester or '–'}",
+        f"Course: <b>{course.code}</b> – {course.name} &nbsp;|&nbsp; "
+        f"Section: <b>{course.section or '—'}</b> &nbsp;|&nbsp; "
+        f"Semester: <b>{course.semester or '—'}</b> &nbsp;|&nbsp; "
+        f"Teacher: <b>{teacher_name}</b>",
         styles["Normal"],
     ))
-    elements.append(Spacer(1, 0.5*cm))
+    elements.append(Spacer(1, 0.4*cm))
 
     # Lock status row
-    lock_status = " | ".join(
-        f"{cat}: {'Final' if locks.get(cat) else 'Open'}"
-        for cat in ("attendance", "quiz", "activity", "mid", "final")
-    )
-    elements.append(Paragraph(f"<i>Submission status — {lock_status}</i>", styles["Normal"]))
-    elements.append(Spacer(1, 0.5*cm))
+    if category:
+        locked = locks.get(category, False)
+        lock_status = f"{category}: {'Finalized ✓' if locked else 'Open (not yet finalized)'}"
+    else:
+        lock_status = " | ".join(
+            f"{cat}: {'Final' if locks.get(cat) else 'Open'}"
+            for cat in ("attendance", "quiz", "activity", "mid", "final")
+        )
+    elements.append(Paragraph(f"<i>Status — {lock_status}</i>", styles["Normal"]))
+    elements.append(Spacer(1, 0.4*cm))
 
     if not students_data:
-        elements.append(Paragraph("No students enrolled.", styles["Normal"]))
+        elements.append(Paragraph("No students enrolled in this course.", styles["Normal"]))
     else:
-        # Use Paragraph for all header and data cells so text wraps properly
-        col_headers = [
-            Paragraph(h, hdr_style)
-            for h in ["#", "Student", "Email",
-                       "Attendance", "Quiz(s)", "Activity(s)", "Mid", "Final"]
-        ]
+        # Determine columns: if filtering by category, show just that category
+        if category:
+            cat_list = [category]
+            col_headers = [
+                Paragraph(h, hdr_style)
+                for h in ["#", "Student", "Email", category.title()]
+            ]
+            col_widths = [1*cm, 5*cm, 6*cm, 8*cm]
+        else:
+            cat_list = ["attendance", "quiz", "activity", "mid", "final"]
+            col_headers = [
+                Paragraph(h, hdr_style)
+                for h in ["#", "Student", "Email",
+                           "Attendance", "Quiz(s)", "Activity(s)", "Mid", "Final"]
+            ]
+            col_widths = [1*cm, 4*cm, 5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm]
+
         table_data = [col_headers]
 
         for idx, (student, marks) in enumerate(students_data, 1):
-            by_cat: dict[str, list] = {
-                "attendance": [], "quiz": [], "activity": [], "mid": [], "final": []
-            }
+            by_cat: dict[str, list] = {c: [] for c in VALID_CATEGORIES}
             for m in marks:
                 if m.category in by_cat:
                     obt = f"{float(m.marks_obtained):.1f}" if m.marks_obtained is not None else "–"
                     tot = f"/{float(m.total_marks):.1f}" if m.total_marks is not None else ""
                     by_cat[m.category].append(f"{m.title}: {obt}{tot}")
 
-            row = [
+            row_base = [
                 Paragraph(str(idx), cell_style),
                 Paragraph(student.name, cell_style),
                 Paragraph(student.email, cell_style),
-                Paragraph("<br/>".join(by_cat["attendance"]) or "–", cell_style),
-                Paragraph("<br/>".join(by_cat["quiz"]) or "–", cell_style),
-                Paragraph("<br/>".join(by_cat["activity"]) or "–", cell_style),
-                Paragraph("<br/>".join(by_cat["mid"]) or "–", cell_style),
-                Paragraph("<br/>".join(by_cat["final"]) or "–", cell_style),
             ]
-            table_data.append(row)
+            for cat in cat_list:
+                row_base.append(Paragraph("<br/>".join(by_cat[cat]) or "—", cell_style))
+            table_data.append(row_base)
 
-        col_widths = [1*cm, 4*cm, 5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm, 3.5*cm]
         t = Table(table_data, colWidths=col_widths, repeatRows=1)
         alt = colors.HexColor("#EFF3FF")
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1565C0")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#006633")),
             ("BACKGROUND", (0, 1), (-1, -1), colors.white),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, alt]),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),

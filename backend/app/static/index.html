@@ -160,6 +160,16 @@ tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
 .alert-success{background:#dcfce7;color:#166534}
 .alert-danger{background:#fee2e2;color:#991b1b}
 
+/* ── Toast notifications ── */
+#toast-container{position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;max-width:360px}
+.toast{padding:.7rem 1rem;border-radius:8px;font-size:.84rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:.5rem;animation:toastIn .2s ease}
+.toast-success{background:#166534;color:#fff}
+.toast-error{background:#991b1b;color:#fff}
+.toast-warn{background:#854d0e;color:#fff}
+.toast-info{background:#1e40af;color:#fff}
+@keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
+@keyframes toastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(120%)}}
+
 /* ── Loader ── */
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(0,102,51,.25);border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:4px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -260,6 +270,9 @@ tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════ TOAST ══ -->
+<div id="toast-container"></div>
+
 <!-- ═══════════════════════════════════════════ SHARED MODAL ══ -->
 <div id="modal-overlay" class="modal-overlay" style="display:none">
   <div class="modal-box" id="modal-box">
@@ -277,6 +290,26 @@ tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
 const API = '/api/v1';
 let _token = localStorage.getItem('scnro_token') || '';
 let _user  = (() => { try{ return JSON.parse(localStorage.getItem('scnro_user')||'null'); }catch(e){return null;} })();
+
+/* ═══════════════════════════════ TOAST ══════════════════════════════ */
+function showToast(msg, type='info', duration=10000) {
+  const tc = $id('toast-container');
+  const el = document.createElement('div');
+  const icons = {success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  tc.appendChild(el);
+  const remove = () => {
+    el.style.animation = 'toastOut .25s ease forwards';
+    setTimeout(() => el.remove(), 260);
+  };
+  const timer = setTimeout(remove, duration);
+  el.addEventListener('click', () => { clearTimeout(timer); remove(); });
+}
+function showToastSuccess(msg){ showToast(msg,'success'); }
+function showToastError(msg)  { showToast(msg,'error'); }
+function showToastWarn(msg)   { showToast(msg,'warn'); }
+function showToastInfo(msg)   { showToast(msg,'info'); }
 
 /* ═══════════════════════════════ HELPERS ════════════════════════════ */
 async function apiFetch(path, opts={}) {
@@ -428,6 +461,10 @@ function doLogout() {
   $id('screen-app').style.display='none';
   $id('screen-login').style.display='flex';
   $id('screen-signup').style.display='none';
+  // Clear login fields for security
+  $id('li-email').value='';
+  $id('li-pass').value='';
+  $id('login-msg').textContent='';
 }
 
 /* ═══════════════════════════════ NAV ════════════════════════════════ */
@@ -539,8 +576,35 @@ PANES.dashboard = async mc => {
     } else {
       const items = await apiFetch('/items').then(r=>r && r.json()).catch(()=>({items:[]}));
       const open = (items&&items.items||[]).filter(i=>i.status!=='Closed').length;
+      // For students also show enrolled courses
+      let coursesHtml = '';
+      if (_user.role === 'student') {
+        try {
+          const cr = await apiFetch('/courses');
+          const cd = cr ? await cr.json() : {};
+          const courses = cd.courses||[];
+          if (courses.length) {
+            coursesHtml = `<div class="card" id="dash-courses">
+              <div class="card-title">📚 My Enrolled Courses</div>
+              <div class="tbl-wrap"><table>
+                <thead><tr><th>Code</th><th>Course</th><th>Teacher</th><th>Section</th><th>Semester</th></tr></thead>
+                <tbody>${courses.map(c=>`<tr>
+                  <td><b>${c.code}</b></td>
+                  <td>${c.name}</td>
+                  <td>${c.teacher_name||'—'}</td>
+                  <td>${c.section||'—'}</td>
+                  <td>${c.semester||'—'}</td>
+                </tr>`).join('')}</tbody>
+              </table></div>
+            </div>`;
+          } else {
+            coursesHtml = `<div class="card"><div class="card-title">📚 My Enrolled Courses</div><p style="color:var(--muted)">You are not enrolled in any courses yet. Go to <b>My Grades → Enrollment Requests</b> to request enrollment.</p></div>`;
+          }
+        } catch(e) { /* ignore */ }
+      }
       $id('dash-stats').innerHTML = `
         <div class="stat-card"><div class="val" style="color:#f59e0b">${open}</div><div class="lbl">Open L&F Reports</div></div>`;
+      $id('dash-extra').innerHTML = coursesHtml;
     }
   } catch(e) { $id('dash-stats').innerHTML='<p class="alert alert-warn">Could not load stats.</p>'; }
 };
@@ -646,6 +710,7 @@ async function loadLFList() {
   const d = await r.json();
   const items = d.items||[];
   const isSAC = _user.role==='sac'||_user.role==='admin';
+  const isAdmin = _user.role==='admin';
   $id('lf-list').innerHTML = items.length ? `<div class="tbl-wrap"><table>
     <thead><tr><th>#</th><th>Item</th><th>Status</th><th>Description</th><th>Date</th>${isSAC?'<th>Action</th>':''}</tr></thead>
     <tbody>${items.map(it=>`<tr>
@@ -653,7 +718,10 @@ async function loadLFList() {
       <td>${badge(it.status, it.status==='Closed'?'badge-grey':it.status==='Lost'?'badge-red':'badge-green')}</td>
       <td>${it.description||'—'}</td>
       <td>${it.created_at?new Date(it.created_at).toLocaleDateString():'—'}</td>
-      ${isSAC?`<td>${it.status!=='Closed'?`<button class="btn btn-sm btn-danger" onclick="closeLFItem(${it.item_id})">Close</button>`:badge('Closed','badge-grey')}</td>`:''}`
+      ${isSAC?`<td>${it.status!=='Closed'
+        ?`<button class="btn btn-sm btn-danger" onclick="closeLFItem(${it.item_id})">Close</button>`
+        :(isAdmin?`<button class="btn btn-sm btn-ghost" onclick="viewClosurePhoto(${it.item_id})">📷 View Photo</button>`+badge('Closed','badge-grey'):badge('Closed','badge-grey'))
+      }</td>`:''}`
     ).join('')}</tbody></table></div>` : '<p style="color:var(--muted)">No reports found.</p>';
 }
 async function submitLostFound() {
@@ -672,11 +740,73 @@ async function submitLostFound() {
   loadLFList();
 }
 async function closeLFItem(id) {
-  if (!confirm('Mark this item as Closed?')) return;
-  const r = await apiFetch(`/items/${id}/close`, {method:'PATCH'});
+  // Open webcam capture modal — live photo required as proof
+  openModal('📷 Close Item — Live Photo Required',`
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:.8rem">A live webcam photo is required to close this report. The photo will be stored and is only accessible to admin users.</p>
+    <div style="text-align:center">
+      <video id="lf-video" autoplay playsinline style="width:100%;max-width:320px;border-radius:8px;border:2px solid var(--g)"></video>
+      <canvas id="lf-canvas" style="display:none"></canvas>
+      <div id="lf-photo-preview" style="margin-top:.6rem"></div>
+    </div>
+    <div id="lf-cam-msg" style="margin-top:.5rem"></div>`,
+    `<button class="btn btn-accent btn-sm" id="lf-capture-btn" onclick="captureLFPhoto()">📷 Capture Photo</button>
+     <button class="btn btn-danger btn-sm" id="lf-confirm-close-btn" style="display:none" onclick="confirmCloseLF(${id})">✓ Confirm Close</button>
+     <button class="btn btn-ghost btn-sm" onclick="stopLFCam();closeModal()">Cancel</button>`
+  );
+  // Start webcam
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    const video = $id('lf-video');
+    video._stream = stream;
+    video.srcObject = stream;
+  } catch(e) {
+    $id('lf-cam-msg').innerHTML='<div class="alert alert-danger">Cannot access camera: '+e.message+'</div>';
+  }
+}
+function stopLFCam() {
+  const video = $id('lf-video');
+  if (video && video._stream) {
+    video._stream.getTracks().forEach(t=>t.stop());
+  }
+}
+function captureLFPhoto() {
+  const video = $id('lf-video');
+  const canvas = $id('lf-canvas');
+  if (!video||!canvas) return;
+  canvas.width  = video.videoWidth  || 320;
+  canvas.height = video.videoHeight || 240;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+  $id('lf-photo-preview').innerHTML = `<img src="${dataUrl}" style="max-width:320px;border-radius:8px;border:2px solid var(--g);margin-top:.4rem"/>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:.3rem">Photo captured. Click <b>Confirm Close</b> to proceed.</p>`;
+  $id('lf-capture-btn').textContent = '🔄 Retake';
+  $id('lf-confirm-close-btn').style.display = '';
+  canvas._dataUrl = dataUrl;
+}
+async function confirmCloseLF(id) {
+  const canvas = $id('lf-canvas');
+  if (!canvas || !canvas._dataUrl) { showToastWarn('Please capture a photo first.'); return; }
+  const r = await apiFetch(`/items/${id}/close`, {
+    method:'PATCH',
+    body: JSON.stringify({closure_photo: canvas._dataUrl})
+  });
   const d = await r.json();
-  if (!r.ok) { alert(d.detail); return; }
+  if (!r.ok) { $id('lf-cam-msg').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`; return; }
+  stopLFCam();
+  closeModal();
+  showToastSuccess('Item marked as Closed.');
   loadLFList();
+}
+
+async function viewClosurePhoto(id) {
+  const r = await apiFetch(`/items/${id}/closure-photo`);
+  if (!r||!r.ok) { showToastError('Could not load photo.'); return; }
+  const d = await r.json();
+  openModal('📷 Closure Proof Photo',
+    d.closure_photo
+      ? `<img src="${d.closure_photo}" style="width:100%;border-radius:8px;border:2px solid var(--g)"/>`
+      : '<p class="alert alert-warn">No photo was captured for this closure.</p>'
+  );
 }
 
 /* ── Faculty (Admin + DC view) ──────────────────────────────────────── */
@@ -1069,7 +1199,13 @@ async function loadAdminSettings() {
     <div id="set-general">
       <div class="form-row">
         <div class="form-field"><label>Portal Name</label><input id="set-name" value="${escHtml(s.portal_name||'SCNRO – PUCIT')}"/></div>
-        <div class="form-field"><label>Logo URL (optional)</label><input id="set-logo" value="${escHtml(s.logo_url||'')}" placeholder="https://…"/></div>
+        <div class="form-field">
+          <label>Logo (upload or paste URL)</label>
+          <input id="set-logo" value="${escHtml(s.logo_url||'')}" placeholder="https://… or upload below"/>
+          <input type="file" id="set-logo-file" accept="image/*" style="margin-top:.3rem;font-size:.82rem" onchange="previewLogoUpload(this)"/>
+          ${s.logo_url?`<img id="set-logo-preview" src="${escHtml(s.logo_url)}" style="margin-top:.4rem;height:48px;border-radius:50%;border:2px solid var(--g)" onerror="this.style.display='none'"/>`:
+          '<img id="set-logo-preview" style="display:none;margin-top:.4rem;height:48px;border-radius:50%;border:2px solid var(--g)"/>'}
+        </div>
       </div>
     </div>
     <!-- Appearance -->
@@ -1143,6 +1279,18 @@ function setTab(btn, pane) {
   });
   const el=$id(pane); if(el) el.style.display='';
 }
+function previewLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    $id('set-logo').value = e.target.result;  // set data URL as the logo_url
+    const preview = $id('set-logo-preview');
+    if (preview) { preview.src = e.target.result; preview.style.display = ''; }
+  };
+  reader.readAsDataURL(file);
+}
+
 function previewTheme() {
   applyTheme({
     theme: $id('set-theme')?.value,
@@ -1171,6 +1319,7 @@ async function saveSettings(){
   if(!r.ok){$id('set-msg-res').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`;return;}
   applyTheme(settings);
   $id('set-msg-res').innerHTML='<div class="alert alert-success">✓ Settings saved and applied.</div>';
+  showToastSuccess('Settings saved and applied.');
 }
 async function resetAllData(){
   if(!confirm('⚠️ This will DELETE ALL data. Admin accounts will be preserved. Type "RESET" to confirm.'))return;
@@ -1205,14 +1354,13 @@ PANES.marks_mgmt = async mc => {
 async function loadCourseMarks(courseId, code, name) {
   const det = $id('mgt-detail');
   det.innerHTML=`<div class="card"><span class="spinner"></span> Loading…</div>`;
-  const [studR, marksR, locksR] = await Promise.all([
+  const [studR, marksR] = await Promise.all([
     apiFetch(`/courses/${courseId}/students`).then(r=>r.json()),
     apiFetch(`/courses/${courseId}/marks`).then(r=>r.json()),
-    apiFetch(`/courses/${courseId}/locks`).then(r=>r.json()),
   ]);
   const students = studR.students||[];
   const allMarks = marksR.marks||[];
-  const locks    = locksR.locks||{};
+  const locks    = marksR.locks||{};
   const CATS = ['attendance','quiz','activity','mid','final'];
 
   function renderCourseDetail() {
@@ -1231,7 +1379,10 @@ async function loadCourseMarks(courseId, code, name) {
             : `<button class="btn btn-sm btn-accent" onclick="openAddMarkModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">➕ Add Mark</button>
                <button class="btn btn-sm btn-primary" onclick="finalizeCat(${courseId},'${cat}')">🔒 Finalize</button>`
           }
-          ${_user.role==='teacher'||_user.role==='admin'?`<button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Download PDF</button>`:''}
+          ${_user.role==='teacher'||_user.role==='admin'?`
+            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>
+            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'mid')">📄 Mid Only</button>
+            <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'final')">📄 Final Only</button>`:''}
         </div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Student</th><th>Title</th><th>Obtained</th><th>Total</th>${isLocked?'':'<th>Actions</th>'}</tr></thead>
@@ -1329,23 +1480,23 @@ async function finalizeCat(courseId,cat){
   if(!confirm(`Finalize '${cat}'? This cannot be undone without admin approval.`))return;
   const r=await apiFetch(`/courses/${courseId}/finalize/${cat}`,{method:'POST'});
   const d=await r.json();
-  if(!r.ok){alert(d.detail);return;}
+  if(!r.ok){showToastError(d.detail||'Finalize failed.');return;}
+  showToastSuccess(`Category '${cat}' finalized.`);
   $id('mgt-detail')._reload && $id('mgt-detail')._reload();
 }
 
-async function downloadPDF(courseId){
+async function downloadPDF(courseId, category){
   const token=_token;
-  const a=document.createElement('a');
-  a.href=`${API}/courses/${courseId}/report.pdf`;
-  // Trigger with auth header via fetch + blob
-  fetch(a.href,{headers:{'Authorization':'Bearer '+token}})
-    .then(r=>{if(!r.ok)throw new Error('PDF error');return r.blob();})
+  const catParam = category ? `?category=${category}` : '';
+  fetch(`${API}/courses/${courseId}/report.pdf${catParam}`,{headers:{'Authorization':'Bearer '+token}})
+    .then(r=>{if(!r.ok)throw new Error('PDF error '+r.status);return r.blob();})
     .then(blob=>{
       const url=URL.createObjectURL(blob);
       const link=document.createElement('a');
-      link.href=url; link.download=`course_${courseId}_result.pdf`;
+      const suffix = category ? `_${category}` : '';
+      link.href=url; link.download=`course_${courseId}${suffix}_result.pdf`;
       link.click(); URL.revokeObjectURL(url);
-    }).catch(e=>alert('PDF download failed: '+e.message));
+    }).catch(e=>showToastError('PDF download failed: '+e.message));
 }
 
 function openMCRModal(courseId, cat, students){
@@ -1420,7 +1571,11 @@ PANES.my_grades = async mc => {
     $id('gr-grades').innerHTML = courses.map(c=>{
       const cMarks=allMarks.filter(m=>m.course_id===c.course_id);
       return `<div class="card">
-        <div class="card-title">📚 ${c.code} – ${c.name} <small style="font-weight:400;color:var(--muted)">${c.section||''} · ${c.semester||''}</small></div>
+        <div class="card-title">📚 ${c.code} – ${c.name}
+          <small style="font-weight:400;color:var(--muted)">
+            ${c.section?'· '+c.section+' ':''} ${c.semester?'· '+c.semester+' ':''} ${c.teacher_name?'· 👩‍🏫 '+c.teacher_name:''}
+          </small>
+        </div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Category</th><th>Title</th><th>Marks</th><th>Total</th><th>%</th></tr></thead>
           <tbody>${CATS.map(cat=>{
@@ -2008,10 +2163,41 @@ async function loadDCTeachers(){
   $id('dc-teachers').innerHTML=`<div class="card"><div class="card-title">👩‍🏫 Teachers (${teachers.length})</div>
   ${teachers.length?teachers.map(t=>`
     <div style="border:1px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:.6rem">
-      <b>${t.name}</b> <span style="color:var(--muted);font-size:.82rem">${t.email}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
+        <div>
+          <b>${t.name}</b> <span style="color:var(--muted);font-size:.82rem">${t.email}</span>
+          ${t.department?`<span class="badge badge-blue" style="margin-left:.4rem">${t.department}</span>`:''}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="viewTeacherStudents(${t.teacher_id},'${escHtml(t.name)}')">👥 View Students</button>
+      </div>
       <div style="margin-top:.4rem">${t.courses.map(c=>`<span class="course-pill">${c.code} – ${c.name}</span>`).join('')}</div>
     </div>`).join('')
   :'<p style="color:var(--muted)">No teachers found for this section.</p>'}</div>`;
+}
+
+async function viewTeacherStudents(teacherId, teacherName) {
+  openModal(`👥 Students taught by ${teacherName}`,`<div style="text-align:center"><span class="spinner"></span></div>`);
+  const r = await apiFetch(`/dc/teachers/${teacherId}/students`);
+  if(!r||!r.ok){ $id('modal-body').innerHTML='<div class="alert alert-danger">Could not load data.</div>'; return; }
+  const d = await r.json();
+  const courses = d.courses||[];
+  if(!courses.length){ $id('modal-body').innerHTML='<div class="alert alert-info">No students enrolled in this teacher\'s courses.</div>'; return; }
+  let html='';
+  courses.forEach(c=>{
+    const students=c.students||[];
+    html+=`<div style="margin-bottom:.8rem">
+      <b>${c.code} – ${c.name}</b>
+      <span style="font-size:.8rem;color:var(--muted)"> · Section: ${c.section||'—'} · Semester: ${c.semester||'—'}</span>
+      ${students.length?`<div class="tbl-wrap" style="margin-top:.4rem"><table>
+        <thead><tr><th>Name</th><th>Email</th><th>Dept</th></tr></thead>
+        <tbody>${students.map(s=>`<tr>
+          <td>${s.name}</td><td>${s.email}</td>
+          <td>${s.department?`<span class="badge badge-${s.department===d.teacher_department?'green':'orange'}">${s.department}</span>`:'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`:'<p style="color:var(--muted);font-size:.83rem">No students enrolled.</p>'}
+    </div>`;
+  });
+  $id('modal-body').innerHTML=html;
 }
 async function loadDCEnrollRequests(){
   $id('dc-enroll').innerHTML='<span class="spinner"></span>';
@@ -2081,14 +2267,14 @@ async function loadEnrollmentRequests(){
     :`<p style="color:var(--muted)">No enrollment requests yet.</p>`;
 }
 async function openEnrollReqModal(){
-  const r=await apiFetch('/courses').then(r=>r.json());
-  // Get all courses (student sees available ones via public endpoint)
-  const allR=await apiFetch('/courses/available').then(r=>r.ok?r.json():{courses:[]}).catch(()=>({courses:[]}));
-  const courses=allR.courses||r.courses||[];
-  if(!courses.length){alert('No available courses found.');return;}
+  // Use /courses/available to show all active courses (any department)
+  const allR=await apiFetch('/courses/available').then(r=>r&&r.ok?r.json():{courses:[]}).catch(()=>({courses:[]}));
+  const courses=(allR.courses||[]).filter(c=>!c.already_enrolled);
+  if(!courses.length){showToastInfo('No new courses available for enrollment (you may already be enrolled in all active courses).');return;}
   openModal('Request Enrollment',`
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">You can enroll in courses from any department. Your degree coordinator will manage your record.</p>
     <div class="form-field"><label>Select Course *</label>
-      <select id="er-course">${courses.map(c=>`<option value="${c.course_id}">${c.code} — ${c.name} (${c.teacher_name||''})</option>`).join('')}</select>
+      <select id="er-course">${courses.map(c=>`<option value="${c.course_id}">${c.code} — ${c.name} (${c.teacher_name||''}${c.teacher_department?' · '+c.teacher_department:''})</option>`).join('')}</select>
     </div>`,
     `<button class="btn btn-primary btn-sm" onclick="submitEnrollReq()">Submit Request</button>
      <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
@@ -2097,8 +2283,10 @@ async function openEnrollReqModal(){
 async function submitEnrollReq(){
   const courseId=parseInt($id('er-course').value);
   const r=await apiFetch('/enrollment-requests',{method:'POST',body:JSON.stringify({course_id:courseId})});
-  if(!r.ok){alert((await r.json()).detail);return;}
-  closeModal(); loadEnrollmentRequests();
+  if(!r.ok){showToastError((await r.json()).detail||'Enrollment request failed.');return;}
+  closeModal();
+  showToastSuccess('✓ Enrollment request submitted! Awaiting approval.');
+  loadEnrollmentRequests();
 }
 
 /* ═══════════════════════════════ INIT ══════════════════════════════ */

@@ -69,6 +69,7 @@ class ItemLostFound(Base):
     location_last_seen = Column(Integer, ForeignKey("locations.location_id"))
     created_at = Column(TIMESTAMP, server_default=func.now())
     closed_by = Column(Integer)  # user_id of SAC/admin who closed it
+    closure_photo = Column(Text)  # base64 data URL of live photo taken at closure (admin-only)
 
     last_seen_location = relationship("Location", back_populates="lost_found_items")
 

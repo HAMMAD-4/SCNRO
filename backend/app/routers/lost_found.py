@@ -116,20 +116,63 @@ def claim_item(
     return {"item_id": item.item_id, "status": item.status}
 
 
+class CloseItemRequest(BaseModel):
+    """Body for closing a lost & found item.
+
+    closure_photo must be a base64-encoded data URL (e.g. ``data:image/jpeg;base64,...``)
+    captured live via the browser webcam.  Admin-only access to view it.
+    """
+    closure_photo: str = Field(
+        ...,
+        description="Base64 data URL of a live webcam photo taken at closure",
+    )
+
+
 @router.patch("/items/{item_id}/close")
 def close_item(
     item_id: int,
+    payload: CloseItemRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "sac")),
 ):
-    """Mark a lost & found report as Closed (SAC office or admin only)."""
+    """Mark a lost & found report as Closed.
+
+    Requires a live webcam photo (base64 data URL) as proof.
+    The photo is stored and only accessible to admin users.
+    SAC officers and admins may close items.
+    """
     item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")
     if item.status == "Closed":
         raise HTTPException(status_code=400, detail="Item already closed.")
+    if not payload.closure_photo or not payload.closure_photo.startswith("data:image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="A valid live webcam photo (data URL) is required to close this item.",
+        )
     item.status = "Closed"
     item.closed_by = current_user.user_id
+    item.closure_photo = payload.closure_photo
     db.commit()
     db.refresh(item)
     return {"item_id": item.item_id, "status": item.status}
+
+
+@router.get("/items/{item_id}/closure-photo")
+def get_closure_photo(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Return the closure proof photo for a closed item (admin only)."""
+    item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if item.status != "Closed":
+        raise HTTPException(status_code=400, detail="Item is not closed yet.")
+    return {
+        "item_id": item.item_id,
+        "closure_photo": item.closure_photo,
+        "closed_by": item.closed_by,
+    }

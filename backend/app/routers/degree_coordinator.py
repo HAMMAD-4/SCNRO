@@ -250,6 +250,60 @@ def get_section_teachers(
     return {"teachers": list(teachers_map.values())}
 
 
+# ── Students taught by a specific teacher ─────────────────────────────────────
+
+@router.get("/teachers/{teacher_id}/students")
+def get_teacher_students(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = _dc_or_admin,
+):
+    """List all students enrolled in courses taught by a given teacher.
+
+    The DC can query this for any teacher associated with their section.
+    Students from outside the DC's own department are included.
+    """
+    # Find all active courses for this teacher
+    courses = db.query(Course).filter(
+        Course.teacher_id == teacher_id,
+        Course.is_active.is_(True),
+    ).all()
+
+    teacher = db.query(User).filter(User.user_id == teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+
+    courses_with_students = []
+    for c in courses:
+        enrollments = db.query(Enrollment).filter(Enrollment.course_id == c.course_id).all()
+        students = []
+        for enr in enrollments:
+            s = db.query(User).filter(User.user_id == enr.student_id).first()
+            if s:
+                students.append({
+                    "student_id": s.user_id,
+                    "name": s.name,
+                    "email": s.email,
+                    "department": s.department,
+                })
+        courses_with_students.append({
+            "course_id": c.course_id,
+            "code": c.code,
+            "name": c.name,
+            "section": c.section,
+            "semester": c.semester,
+            "students": students,
+        })
+
+    return {
+        "teacher_id": teacher_id,
+        "teacher_name": teacher.name,
+        "teacher_department": teacher.department,
+        "courses": courses_with_students,
+    }
+
+
+
 # ── Schedule for this section ─────────────────────────────────────────────────
 
 @router.get("/schedule")
