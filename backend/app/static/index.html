@@ -1,0 +1,2533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SCNRO – PUCIT Smart Campus</title>
+<!-- Anti-flash: runs synchronously before first paint -->
+<script>
+(function(){
+  var t=localStorage.getItem('scnro_token'),u=localStorage.getItem('scnro_user');
+  document.documentElement.className=t&&u?'authed':'guest';
+})();
+</script>
+<style>
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#222;min-height:100vh}
+
+/* ── PUCIT colour palette ── */
+:root{
+  --g:#006633;      /* PUCIT green  */
+  --gd:#004d26;     /* darker green */
+  --gl:#e6f4ee;     /* light green  */
+  --au:#C9A227;     /* gold accent  */
+  --ald:#a07d15;
+  --white:#fff;
+  --grey:#f1f3f5;
+  --border:#d1d5db;
+  --text:#222;
+  --muted:#6b7280;
+  --danger:#dc2626;
+  --info:#1d4ed8;
+  --radius:8px;
+  --shadow:0 2px 8px rgba(0,0,0,.12);
+}
+
+/* ── Anti-flash: hide wrong screen before JS fully loads ── */
+html.guest   #screen-app    {display:none!important}
+html.guest   #screen-signup {display:none!important}
+html.authed  #screen-login  {display:none!important}
+html.authed  #screen-signup {display:none!important}
+html.signup  #screen-login  {display:none!important}
+html.signup  #screen-app    {display:none!important}
+html:not(.guest):not(.authed):not(.signup) #screen-login,
+html:not(.guest):not(.authed):not(.signup) #screen-app,
+html:not(.guest):not(.authed):not(.signup) #screen-signup{display:none!important}
+
+/* ── Typography ── */
+h2{font-size:1.3rem;font-weight:700;color:var(--g);margin-bottom:1rem}
+h3{font-size:1.05rem;font-weight:600;color:var(--gd);margin-bottom:.6rem}
+
+/* ── Auth screens ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--gd) 0%,var(--g) 60%,var(--au) 100%)}
+.auth-card{background:var(--white);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.25);width:380px;overflow:hidden}
+.auth-header{background:var(--g);color:var(--white);padding:1.4rem 1.6rem;display:flex;align-items:center;gap:.8rem}
+.auth-header img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--au)}
+.auth-header h1{font-size:1.15rem;font-weight:700;line-height:1.2}
+.auth-header p{font-size:.75rem;opacity:.85}
+.auth-body{padding:1.6rem}
+.auth-body label{display:block;font-size:.82rem;font-weight:600;color:var(--gd);margin-bottom:.3rem;margin-top:.9rem}
+.auth-body label:first-of-type{margin-top:0}
+.auth-body input,.auth-body select{width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.9rem;transition:border-color .2s}
+.auth-body input:focus,.auth-body select:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(0,102,51,.15)}
+.btn{display:inline-block;padding:.55rem 1.2rem;border:none;border-radius:var(--radius);font-size:.9rem;font-weight:600;cursor:pointer;transition:background .2s,opacity .2s}
+.btn-primary{background:var(--g);color:var(--white)}
+.btn-primary:hover{background:var(--gd)}
+.btn-accent{background:var(--au);color:var(--white)}
+.btn-accent:hover{background:var(--ald)}
+.btn-danger{background:var(--danger);color:var(--white)}
+.btn-danger:hover{opacity:.85}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--grey)}
+.btn-sm{padding:.3rem .75rem;font-size:.8rem}
+.btn-full{width:100%;margin-top:1rem}
+.auth-link{text-align:center;margin-top:.9rem;font-size:.83rem;color:var(--muted)}
+.auth-link a{color:var(--g);font-weight:600;cursor:pointer;text-decoration:none}
+.auth-link a:hover{text-decoration:underline}
+.auth-msg{margin-top:.7rem;padding:.5rem .75rem;border-radius:var(--radius);font-size:.83rem;display:none}
+.auth-msg.error{background:#fee2e2;color:#991b1b;display:block}
+.auth-msg.success{background:#dcfce7;color:#166534;display:block}
+
+/* ── App shell ── */
+.app-shell{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:220px;background:var(--g);color:var(--white);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-brand{padding:1rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.15);display:flex;align-items:center;gap:.6rem}
+.sidebar-brand .logo{width:36px;height:36px;background:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--g);font-weight:700;font-size:.9rem;flex-shrink:0}
+.sidebar-brand span{font-size:.85rem;font-weight:700;line-height:1.2}
+.sidebar-user{padding:.8rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.15);font-size:.78rem;opacity:.9}
+.sidebar-user strong{display:block;font-size:.88rem}
+.sidebar-user .role-badge{display:inline-block;margin-top:.2rem;background:var(--au);color:var(--white);font-size:.7rem;font-weight:700;padding:.1rem .4rem;border-radius:4px;text-transform:uppercase}
+nav.sidebar-nav{flex:1;overflow-y:auto;padding:.5rem 0}
+.nav-item{display:flex;align-items:center;gap:.6rem;padding:.62rem 1.2rem;cursor:pointer;font-size:.87rem;border-left:3px solid transparent;transition:background .15s,border-color .15s}
+.nav-item:hover{background:rgba(255,255,255,.12)}
+.nav-item.active{background:rgba(255,255,255,.18);border-left-color:var(--au);font-weight:600}
+.nav-item .ico{font-size:1rem;width:18px;text-align:center}
+.sidebar-footer{padding:.8rem 1.2rem;border-top:1px solid rgba(255,255,255,.15)}
+.sidebar-footer .btn{background:rgba(255,255,255,.15);color:var(--white);border:1px solid rgba(255,255,255,.25);width:100%;font-size:.82rem}
+.sidebar-footer .btn:hover{background:rgba(255,255,255,.25)}
+
+/* Main content */
+.main-content{flex:1;overflow-y:auto;padding:1.5rem;background:#f4f6f8}
+
+/* ── Cards ── */
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.2rem;margin-bottom:1rem}
+.card-title{font-size:1rem;font-weight:700;color:var(--gd);margin-bottom:.8rem;display:flex;align-items:center;gap:.4rem}
+
+/* ── Stat grid ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.2rem}
+.stat-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem;border-top:3px solid var(--g);text-align:center}
+.stat-card .val{font-size:1.8rem;font-weight:700;color:var(--g)}
+.stat-card .lbl{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.87rem}
+thead th{background:var(--g);color:var(--white);padding:.5rem .75rem;text-align:left;white-space:nowrap}
+tbody tr:nth-child(even){background:var(--gl)}
+tbody tr:hover{background:#d4edda}
+tbody td{padding:.45rem .75rem;border-bottom:1px solid var(--border)}
+
+/* ── Form ── */
+.form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.8rem;margin-bottom:.8rem}
+.form-field{display:flex;flex-direction:column;gap:.3rem}
+.form-field label{font-size:.8rem;font-weight:600;color:var(--gd)}
+.form-field input,.form-field select,.form-field textarea{padding:.45rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;transition:border-color .2s}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(0,102,51,.12)}
+.form-field textarea{resize:vertical;min-height:70px}
+.form-actions{display:flex;gap:.6rem;margin-top:.8rem;flex-wrap:wrap}
+
+/* ── Badge ── */
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:99px;font-size:.73rem;font-weight:600}
+.badge-green{background:#dcfce7;color:#166534}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-orange{background:#ffedd5;color:#9a3412}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-grey{background:#f3f4f6;color:#374151}
+.badge-gold{background:#fef9c3;color:#854d0e}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:var(--white);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.2rem;border-bottom:1px solid var(--border)}
+.modal-header h3{color:var(--gd)}
+.modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);line-height:1}
+.modal-close:hover{color:var(--danger)}
+.modal-body{padding:1.2rem}
+.modal-footer{padding:.8rem 1.2rem;border-top:1px solid var(--border);display:flex;gap:.6rem;justify-content:flex-end}
+
+/* ── Room availability pills ── */
+.avail-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.avail-dot.on{background:#22c55e}
+.avail-dot.off{background:#ef4444}
+
+/* ── Alert banner ── */
+.alert{padding:.6rem .9rem;border-radius:var(--radius);font-size:.84rem;margin-bottom:.8rem}
+.alert-info{background:#dbeafe;color:#1e40af}
+.alert-warn{background:#fef9c3;color:#854d0e}
+.alert-success{background:#dcfce7;color:#166534}
+.alert-danger{background:#fee2e2;color:#991b1b}
+
+/* ── Toast notifications ── */
+#toast-container{position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;max-width:360px}
+.toast{padding:.7rem 1rem;border-radius:8px;font-size:.84rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:.5rem;animation:toastIn .2s ease}
+.toast-success{background:#166534;color:#fff}
+.toast-error{background:#991b1b;color:#fff}
+.toast-warn{background:#854d0e;color:#fff}
+.toast-info{background:#1e40af;color:#fff}
+@keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
+@keyframes toastOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(120%)}}
+
+/* ── Loader ── */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(0,102,51,.25);border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Tab bar (marks mgmt) ── */
+.tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1rem;flex-wrap:wrap}
+.tab-btn{padding:.5rem 1rem;border:none;background:none;cursor:pointer;font-size:.87rem;font-weight:500;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s}
+.tab-btn.active{color:var(--g);border-bottom-color:var(--g);font-weight:700}
+
+/* ── My grades card per course ── */
+.course-pill{display:inline-flex;align-items:center;gap:.4rem;background:var(--gl);border:1px solid var(--g);border-radius:6px;padding:.25rem .7rem;font-size:.82rem;color:var(--gd);font-weight:600;margin:.2rem}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ LOGIN ══ -->
+<div id="screen-login" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div style="background:var(--au);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">🎓</div>
+      <div><h1>SCNRO – PUCIT</h1><p>Smart Campus Navigation &amp; Resource Optimizer</p></div>
+    </div>
+    <div class="auth-body">
+      <form id="login-form" onsubmit="doLogin(event)">
+        <label for="li-email">University Email</label>
+        <input id="li-email" type="email" placeholder="yourname@pucit.edu.pk" required autocomplete="username"/>
+        <label for="li-pass">Password</label>
+        <input id="li-pass" type="password" placeholder="••••••••" required autocomplete="current-password"/>
+        <div id="login-msg" class="auth-msg"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="login-btn">Sign In</button>
+      </form>
+      <div class="auth-link">Don't have an account? <a onclick="showSignup()">Request Access</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ SIGNUP ══ -->
+<div id="screen-signup" class="auth-wrap" style="display:none">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div style="background:var(--au);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">📋</div>
+      <div><h1>Request Access</h1><p>Admin approval required before login</p></div>
+    </div>
+    <div class="auth-body">
+      <label for="su-name">Full Name</label>
+      <input id="su-name" type="text" placeholder="Your full name" required/>
+      <label for="su-email">University Email</label>
+      <input id="su-email" type="email" placeholder="yourname@pucit.edu.pk" required/>
+      <label for="su-role">Role</label>
+      <select id="su-role" onchange="updateSignupDeptVisibility()">
+        <option value="student">Student</option>
+        <option value="teacher">Teacher / Lecturer</option>
+        <option value="sac">SAC Officer</option>
+        <option value="head_clerk">Head Clerk</option>
+        <option value="degree_coordinator">Degree Coordinator</option>
+      </select>
+      <label for="su-dept">Department</label>
+      <select id="su-dept">
+        <option value="">— Select Department —</option>
+        <option value="IT">IT</option>
+        <option value="CS">CS</option>
+        <option value="SE">SE</option>
+        <option value="DS">DS</option>
+        <option value="AI">AI</option>
+      </select>
+      <label for="su-pass">Password</label>
+      <input id="su-pass" type="password" placeholder="Min 6 characters" required/>
+      <div id="signup-msg" class="auth-msg"></div>
+      <button class="btn btn-accent btn-full" onclick="doSignup()">Submit Request</button>
+      <div class="auth-link">Already have an account? <a onclick="showLogin()">Sign In</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ APP ══ -->
+<div id="screen-app" class="app-shell" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">PU</div>
+      <span>SCNRO<br/>PUCIT</span>
+    </div>
+    <div class="sidebar-user">
+      <strong id="sb-name">—</strong>
+      <span id="sb-email" style="font-size:.72rem;opacity:.8;display:block"></span>
+      <span id="sb-role-badge" class="role-badge">—</span>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer">
+      <button class="btn btn-sm" onclick="doLogout()">⇠ Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- Content panes -->
+  <div class="main-content" id="main-content">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TOAST ══ -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════ SHARED MODAL ══ -->
+<div id="modal-overlay" class="modal-overlay" style="display:none">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">Modal</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════ STATE ══════════════════════════════ */
+const API = '/api/v1';
+let _token = localStorage.getItem('scnro_token') || '';
+let _user  = (() => { try{ return JSON.parse(localStorage.getItem('scnro_user')||'null'); }catch(e){return null;} })();
+
+/* ═══════════════════════════════ TOAST ══════════════════════════════ */
+function showToast(msg, type='info', duration=5000) {
+  const tc = $id('toast-container');
+  const el = document.createElement('div');
+  const icons = {success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  tc.appendChild(el);
+  const remove = () => {
+    el.style.animation = 'toastOut .25s ease forwards';
+    setTimeout(() => el.remove(), 260);
+  };
+  const timer = setTimeout(remove, duration);
+  el.addEventListener('click', () => { clearTimeout(timer); remove(); });
+}
+function showToastSuccess(msg){ showToast(msg,'success'); }
+function showToastError(msg)  { showToast(msg,'error'); }
+function showToastWarn(msg)   { showToast(msg,'warn'); }
+function showToastInfo(msg)   { showToast(msg,'info'); }
+
+/* ═══════════════════════════════ HELPERS ════════════════════════════ */
+async function apiFetch(path, opts={}) {
+  const headers = {'Content-Type':'application/json'};
+  if (_token) headers['Authorization'] = 'Bearer ' + _token;
+  const r = await fetch(API + path, { ...opts, headers });
+  if (r.status === 401) { doLogout(); return null; }
+  return r;
+}
+const $id = id => document.getElementById(id);
+function showMsg(el, txt, type='error') {
+  el.textContent = txt;
+  el.className = 'auth-msg ' + type;
+}
+function openModal(title, bodyHtml, footerHtml='') {
+  $id('modal-title').textContent = title;
+  $id('modal-body').innerHTML = bodyHtml;
+  $id('modal-footer').innerHTML = footerHtml;
+  $id('modal-overlay').style.display = 'flex';
+}
+function closeModal() { $id('modal-overlay').style.display = 'none'; }
+$id('modal-overlay').addEventListener('click', e => { if(e.target === $id('modal-overlay')) closeModal(); });
+
+function fmtRole(r) {
+  return {admin:'Admin',teacher:'Teacher',student:'Student',sac:'SAC Officer',
+    head_clerk:'Head Clerk',degree_coordinator:'Degree Coordinator'}[r]||r;
+}
+function badge(txt, cls) { return `<span class="badge ${cls}">${txt}</span>`; }
+
+/* ═══════════════════════════════ THEME ══════════════════════════════ */
+const THEMES = {
+  green: {g:'#006633',gd:'#004d26',gl:'#e6f4ee',au:'#C9A227',ald:'#a07d15',text:'#222',bg:'#f4f6f8'},
+  blue:  {g:'#1d4ed8',gd:'#1e3a8a',gl:'#dbeafe',au:'#f59e0b',ald:'#d97706',text:'#1e293b',bg:'#f0f4ff'},
+  dark:  {g:'#1f2937',gd:'#111827',gl:'#374151',au:'#f59e0b',ald:'#d97706',text:'#e5e7eb',bg:'#0f172a'},
+  purple:{g:'#7c3aed',gd:'#5b21b6',gl:'#ede9fe',au:'#f59e0b',ald:'#d97706',text:'#1e1b4b',bg:'#faf5ff'},
+  red:   {g:'#dc2626',gd:'#991b1b',gl:'#fee2e2',au:'#f59e0b',ald:'#d97706',text:'#1c1917',bg:'#fff5f5'},
+};
+const FONTS = {
+  segoe:  "'Segoe UI', Arial, sans-serif",
+  roboto: "'Roboto', 'Segoe UI', sans-serif",
+  inter:  "'Inter', 'Segoe UI', sans-serif",
+  mono:   "'Courier New', Courier, monospace",
+  serif:  "Georgia, 'Times New Roman', serif",
+};
+
+function applyTheme(settings) {
+  const t = THEMES[settings.theme] || THEMES.green;
+  const root = document.documentElement;
+  root.style.setProperty('--g',   t.g);
+  root.style.setProperty('--gd',  t.gd);
+  root.style.setProperty('--gl',  t.gl);
+  root.style.setProperty('--au',  t.au);
+  root.style.setProperty('--ald', t.ald);
+  root.style.setProperty('--text',t.text);
+  if (settings.primary_color) root.style.setProperty('--g',   settings.primary_color);
+  if (settings.accent_color)  root.style.setProperty('--au',  settings.accent_color);
+  document.body.style.background = settings.bg_color || t.bg;
+  document.body.style.color      = t.text;
+  document.body.style.fontFamily = FONTS[settings.font] || FONTS.segoe;
+  // Portal name in sidebar
+  const brandEl = document.querySelector('.sidebar-brand span');
+  if (brandEl && settings.portal_name) brandEl.innerHTML = `${settings.portal_name}<br/>PUCIT`;
+  document.title = settings.portal_name || 'SCNRO – PUCIT Smart Campus';
+  // Logo
+  const logoEl = document.querySelector('.sidebar-brand .logo');
+  if (logoEl && settings.logo_url) {
+    logoEl.innerHTML = `<img src="${settings.logo_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>`;
+  }
+}
+
+async function loadAndApplySettings() {
+  try {
+    const r = await apiFetch('/admin/settings');
+    if (!r || !r.ok) return;
+    const d = await r.json();
+    if (d.settings) applyTheme(d.settings);
+  } catch(e) { /* ignore */ }
+}
+
+/* ═══════════════════════════════ AUTH ═══════════════════════════════ */
+function showLogin() {
+  document.documentElement.className = 'guest';
+  $id('screen-signup').style.display = 'none';
+  $id('screen-login').style.display  = 'flex';
+}
+function showSignup() {
+  document.documentElement.className = 'signup';
+  $id('screen-login').style.display  = 'none';
+  $id('screen-signup').style.display = 'flex';
+}
+function updateSignupDeptVisibility() {
+  // All roles get a department field — always visible
+}
+
+async function doLogin(e) {
+  e && e.preventDefault();
+  const email = $id('li-email').value.trim();
+  const pass  = $id('li-pass').value;
+  const msg   = $id('login-msg');
+  const btn   = $id('login-btn');
+  if (!email || !pass) { showMsg(msg,'Please enter email and password.'); return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Signing in…';
+  try {
+    const r = await fetch(API + '/auth/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await r.json();
+    if (!r.ok) { showMsg(msg, data.detail || 'Invalid credentials.'); return; }
+    _token = data.access_token;
+    const me = await (await apiFetch('/auth/me')).json();
+    _user = me;
+    localStorage.setItem('scnro_token', _token);
+    localStorage.setItem('scnro_user', JSON.stringify(_user));
+    bootApp();
+  } catch(err) {
+    showMsg(msg, 'Connection error. Try again.');
+  } finally {
+    btn.disabled=false; btn.textContent='Sign In';
+  }
+}
+
+async function doSignup() {
+  const name  = $id('su-name').value.trim();
+  const email = $id('su-email').value.trim();
+  const role  = $id('su-role').value;
+  const dept  = $id('su-dept').value;
+  const pass  = $id('su-pass').value;
+  const msg   = $id('signup-msg');
+  if (!name||!email||!pass) { showMsg(msg,'All fields are required.'); return; }
+  if (pass.length < 6)      { showMsg(msg,'Password must be at least 6 characters.'); return; }
+  const r = await apiFetch('/auth/signup-request', {
+    method:'POST',
+    body: JSON.stringify({name, email, password:pass, role, department: dept||null})
+  });
+  if (!r) return;
+  const data = await r.json();
+  if (!r.ok) { showMsg(msg, data.detail || 'Error.'); return; }
+  showMsg(msg,'✓ Request submitted! Wait for admin approval.','success');
+  setTimeout(showLogin, 2000);
+}
+
+function doLogout() {
+  _token=''; _user=null;
+  localStorage.removeItem('scnro_token');
+  localStorage.removeItem('scnro_user');
+  window.location.href = '/';
+}
+
+/* ═══════════════════════════════ NAV ════════════════════════════════ */
+const NAV_ALL = [
+  {id:'dashboard',   ico:'🏠', lbl:'Dashboard'},
+  {id:'free_rooms',  ico:'🚪', lbl:'Free Rooms'},
+  {id:'navigate',    ico:'🗺', lbl:'Navigate'},
+  {id:'lostfound',   ico:'🔍', lbl:'Lost & Found'},
+  {id:'faculty',     ico:'👥', lbl:'Faculty',         roles:['admin','degree_coordinator']},
+  {id:'admin_panel', ico:'⚙',  lbl:'Admin Panel',     roles:['admin']},
+  {id:'marks_mgmt',  ico:'📊', lbl:'Marks Mgmt',      roles:['teacher','admin']},
+  {id:'my_grades',   ico:'🎓', lbl:'My Grades',        roles:['student']},
+  {id:'room_mgmt',   ico:'🏢', lbl:'Room Mgmt',        roles:['head_clerk','admin']},
+  {id:'course_mgmt', ico:'📚', lbl:'Course Mgmt',      roles:['head_clerk','admin']},
+  {id:'dc_panel',    ico:'🎯', lbl:'My Section',       roles:['degree_coordinator']},
+];
+
+let _currentPane = '';
+
+function buildNav() {
+  const role = _user.role;
+  const nav = $id('sidebar-nav');
+  nav.innerHTML = '';
+  NAV_ALL.forEach(item => {
+    if (item.roles && !item.roles.includes(role)) return;
+    const el = document.createElement('div');
+    el.className = 'nav-item';
+    el.dataset.pane = item.id;
+    el.innerHTML = `<span class="ico">${item.ico}</span><span>${item.lbl}</span>`;
+    el.addEventListener('click', () => showPane(item.id));
+    nav.appendChild(el);
+  });
+}
+
+function showPane(id) {
+  _currentPane = id;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.pane === id);
+  });
+  const mc = $id('main-content');
+  mc.innerHTML = '<div style="text-align:center;padding:2rem"><span class="spinner"></span> Loading…</div>';
+  PANES[id] ? PANES[id](mc) : (mc.innerHTML='<p>Pane not found.</p>');
+}
+
+/* ═════════════════════════════ BOOT APP ════════════════════════════ */
+function bootApp() {
+  document.documentElement.className = 'authed';
+  $id('screen-login').style.display  = 'none';
+  $id('screen-signup').style.display = 'none';
+  $id('screen-app').style.display    = 'flex';
+
+  $id('sb-name').textContent  = _user.name;
+  $id('sb-email').textContent = _user.email;
+  $id('sb-role-badge').textContent = fmtRole(_user.role) + (_user.department ? ' · ' + _user.department : '');
+
+  buildNav();
+
+  // Apply portal settings (theme, name, logo) for all users
+  loadAndApplySettings();
+
+  // Pick the first pane visible for this role
+  const first = NAV_ALL.find(n => !n.roles || n.roles.includes(_user.role));
+  if (first) showPane(first.id);
+}
+
+/* ═════════════════════════════ PANES ═══════════════════════════════ */
+const PANES = {};
+
+/* ── Dashboard ──────────────────────────────────────────────────────── */
+PANES.dashboard = async mc => {
+  mc.innerHTML = `<h2>🏠 Dashboard</h2>
+  <div class="stat-grid" id="dash-stats"><div class="stat-card"><div class="spinner"></div></div></div>
+  <div id="dash-charts" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1rem">
+      <div class="card"><div class="card-title">👥 Users by Role</div><canvas id="chart-users" width="280" height="180"></canvas></div>
+      <div class="card"><div class="card-title">📚 Academics</div><canvas id="chart-academics" width="280" height="180"></canvas></div>
+      <div class="card"><div class="card-title">🔍 Lost &amp; Found</div><canvas id="chart-lf" width="280" height="180"></canvas></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">📢 Welcome to SCNRO</div>
+    <p style="font-size:.9rem;color:var(--muted)">Smart Campus Navigation &amp; Resource Optimizer for Punjab University College of Information Technology.</p>
+  </div>
+  <div id="dash-extra"></div>`;
+  try {
+    if (_user.role === 'admin') {
+      const r = await apiFetch('/admin/dashboard-stats');
+      if (!r || !r.ok) throw new Error('Stats unavailable');
+      const d = await r.json();
+      $id('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="val">${d.users.total}</div><div class="lbl">Total Users</div></div>
+        <div class="stat-card"><div class="val" style="color:#1d4ed8">${d.users.students}</div><div class="lbl">Students</div></div>
+        <div class="stat-card"><div class="val" style="color:#6d28d9">${d.users.teachers}</div><div class="lbl">Teachers</div></div>
+        <div class="stat-card"><div class="val" style="color:#0891b2">${d.users.clerical}</div><div class="lbl">Clerical Staff</div></div>
+        <div class="stat-card"><div class="val" style="color:#d97706">${d.users.degree_coordinators}</div><div class="lbl">Degree Coords</div></div>
+        <div class="stat-card"><div class="val">${d.rooms.total}</div><div class="lbl">Total Rooms</div></div>
+        <div class="stat-card"><div class="val" style="color:#22c55e">${d.rooms.active}</div><div class="lbl">Active Rooms</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_courses}</div><div class="lbl">Active Courses</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_sections}</div><div class="lbl">Sections</div></div>
+        <div class="stat-card"><div class="val">${d.academics.total_enrollments}</div><div class="lbl">Enrollments</div></div>
+        <div class="stat-card"><div class="val" style="color:#f59e0b">${d.lost_found.open}</div><div class="lbl">L&F Open</div></div>
+        <div class="stat-card"><div class="val" style="color:#6b7280">${d.lost_found.closed}</div><div class="lbl">L&F Closed</div></div>`;
+
+      // Draw charts
+      try {
+        $id('dash-charts').style.display = '';
+        _drawBarChart('chart-users',
+          ['Students','Teachers','Clerical','DC','Others'],
+          [d.users.students, d.users.teachers, d.users.clerical, d.users.degree_coordinators,
+           Math.max(0, d.users.total - d.users.students - d.users.teachers - d.users.clerical - d.users.degree_coordinators)],
+          ['#1d4ed8','#6d28d9','#0891b2','#d97706','#6b7280']
+        );
+        _drawBarChart('chart-academics',
+          ['Courses','Sections','Enrollments'],
+          [d.academics.total_courses, d.academics.total_sections, d.academics.total_enrollments],
+          ['#006633','#22c55e','#86efac']
+        );
+        _drawBarChart('chart-lf',
+          ['Open','Closed'],
+          [d.lost_found.open, d.lost_found.closed],
+          ['#f59e0b','#6b7280']
+        );
+      } catch(_chartErr) { /* charts are best-effort; stats still visible above */ }
+
+      const p = d.pending_requests;
+      $id('dash-extra').innerHTML = `
+        <div class="card"><div class="card-title">⏳ Pending Requests</div>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="val" style="color:#ef4444">${p.signups}</div><div class="lbl">Signup Requests</div></div>
+            <div class="stat-card"><div class="val" style="color:#f59e0b">${p.course_requests}</div><div class="lbl">Course Requests</div></div>
+            <div class="stat-card"><div class="val" style="color:#3b82f6">${p.enrollment_requests}</div><div class="lbl">Enrollment Req.</div></div>
+            <div class="stat-card"><div class="val" style="color:#8b5cf6">${p.mark_change_requests}</div><div class="lbl">Mark Changes</div></div>
+          </div>
+          ${p.total ? `<p class="alert alert-warn" style="margin-top:.5rem">⚠️ ${p.total} request(s) awaiting your attention.</p>` : '<p class="alert alert-success">✓ No pending requests.</p>'}
+        </div>`;
+    } else {
+      const items = await apiFetch('/items').then(r=>r && r.json()).catch(()=>({items:[]}));
+      const open = (items&&items.items||[]).filter(i=>i.status!=='Closed').length;
+      // For students also show enrolled courses
+      let coursesHtml = '';
+      if (_user.role === 'student') {
+        try {
+          const cr = await apiFetch('/courses');
+          const cd = cr ? await cr.json() : {};
+          const courses = cd.courses||[];
+          if (courses.length) {
+            coursesHtml = `<div class="card" id="dash-courses">
+              <div class="card-title">📚 My Enrolled Courses</div>
+              <div class="tbl-wrap"><table>
+                <thead><tr><th>Code</th><th>Course</th><th>Teacher</th><th>Section</th><th>Semester</th></tr></thead>
+                <tbody>${courses.map(c=>`<tr>
+                  <td><b>${c.code}</b></td>
+                  <td>${c.name}</td>
+                  <td>${c.teacher_name||'—'}</td>
+                  <td>${c.section||'—'}</td>
+                  <td>${c.semester||'—'}</td>
+                </tr>`).join('')}</tbody>
+              </table></div>
+            </div>`;
+          } else {
+            coursesHtml = `<div class="card"><div class="card-title">📚 My Enrolled Courses</div><p style="color:var(--muted)">You are not enrolled in any courses yet. Go to <b>My Grades → Enrollment Requests</b> to request enrollment.</p></div>`;
+          }
+        } catch(e) { /* ignore */ }
+      }
+      $id('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="val" style="color:#f59e0b">${open}</div><div class="lbl">Open L&F Reports</div></div>`;
+      $id('dash-extra').innerHTML = coursesHtml;
+    }
+  } catch(e) {
+    $id('dash-stats').innerHTML='<div class="alert alert-warn">⚠️ Could not load dashboard stats. Please try refreshing the page.</div>';
+  }
+};
+
+/** Simple canvas bar chart renderer — no external library needed */
+function _drawBarChart(canvasId, labels, values, colors) {
+  const canvas = $id(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const W = canvas.width, H = canvas.height;
+  const PAD = {top:10, right:10, bottom:28, left:40};
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+  const max = Math.max(...values, 1);
+  const barW = Math.floor(chartW / (labels.length * 1.5));
+  const gap   = Math.floor(chartW / labels.length);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+
+  // Y-axis grid lines (4 lines)
+  ctx.fillStyle = '#9ca3af'; ctx.font = '10px Segoe UI, Arial, sans-serif';
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + chartH - (i / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.fillText(Math.round(max * i / 4), 2, y + 3);
+  }
+
+  // Bars
+  labels.forEach((lbl, i) => {
+    const barH = values[i] / max * chartH;
+    const x = PAD.left + i * gap + (gap - barW) / 2;
+    const y = PAD.top + chartH - barH;
+    ctx.fillStyle = colors[i] || '#006633';
+    ctx.fillRect(x, y, barW, barH);
+
+    // Value label on top of bar
+    ctx.fillStyle = '#374151'; ctx.font = 'bold 10px Segoe UI, Arial, sans-serif';
+    ctx.fillText(values[i], x + barW/2 - ctx.measureText(String(values[i])).width/2, y - 2);
+
+    // X-axis label
+    ctx.fillStyle = '#6b7280'; ctx.font = '9px Segoe UI, Arial, sans-serif';
+    const lblX = x + barW/2 - ctx.measureText(lbl).width/2;
+    ctx.fillText(lbl, lblX, H - 6);
+  });
+}
+
+/* ── Free Rooms ─────────────────────────────────────────────────────── */
+PANES.free_rooms = async mc => {
+  mc.innerHTML = `<h2>🚪 Free Rooms</h2>
+  <div id="free-rooms-result"><div style="text-align:center;padding:2rem"><span class="spinner"></span> Loading…</div></div>`;
+  loadFreeRooms(mc);
+};
+async function loadFreeRooms(mc) {
+  const el = $id('free-rooms-result') || mc;
+  try {
+    const r = await apiFetch('/resources/free-rooms');
+    if (!r || !r.ok) throw new Error('Failed to load');
+    const d = await r.json();
+    const never   = d.never_scheduled || [];
+    const current = d.currently_free  || [];
+
+    function roomTable(rooms) {
+      if (!rooms.length) return '<p style="color:var(--muted);font-size:.85rem">None</p>';
+      return `<div class="tbl-wrap"><table>
+        <thead><tr><th>Room</th><th>Category</th><th>Wing</th><th>Floor</th></tr></thead>
+        <tbody>${rooms.map(r=>`<tr>
+          <td><b>${r.name}</b></td><td>${r.category||'—'}</td>
+          <td>${r.wing_name||'—'}</td><td>${r.floor_level??'—'}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    el.innerHTML = `
+      <div class="stat-grid" style="margin-bottom:.8rem">
+        <div class="stat-card"><div class="val" style="color:#22c55e">${never.length}</div><div class="lbl">Fully Unscheduled</div></div>
+        <div class="stat-card"><div class="val" style="color:#3b82f6">${current.length}</div><div class="lbl">Currently Free</div></div>
+        <div class="stat-card"><div class="val" style="color:var(--g)">${d.total_free||0}</div><div class="lbl">Total Free Now</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🟢 Fully Unscheduled Rooms <span style="font-weight:400;color:var(--muted);font-size:.82rem">(no class ever assigned)</span></div>
+        ${roomTable(never)}
+      </div>
+      <div class="card">
+        <div class="card-title">🔵 Currently Free Rooms <span style="font-weight:400;color:var(--muted);font-size:.82rem">(have schedule but free right now)</span></div>
+        ${roomTable(current)}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-danger">Error loading rooms: ${e.message}</div>`;
+  }
+}
+
+/* ── Navigate ───────────────────────────────────────────────────────── */
+PANES.navigate = async mc => {
+  mc.innerHTML = `<h2>🗺 Navigate</h2>
+  <div class="card">
+    <div class="form-row">
+      <div class="form-field"><label>From (Room / Location)</label>
+        <select id="nav-from" onchange="updateNavToOptions()"><option value="">— select room —</option></select>
+      </div>
+      <div class="form-field"><label>To (Room / Location)</label>
+        <select id="nav-to"><option value="">— select room —</option></select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="loadNavRoute()">🗺 Get Route</button>
+  </div>
+  <div id="nav-result"></div>
+  <div class="card" id="locations-list-card">
+    <div class="card-title">📍 All Locations</div>
+    <div id="all-locs-body"><span class="spinner"></span></div>
+  </div>`;
+
+  // Populate location dropdowns
+  const r = await apiFetch('/resources/locations');
+  if (r && r.ok) {
+    const d = await r.json();
+    _navLocations = d.locations || [];
+    _populateNavDropdowns(_navLocations, null);
+    $id('all-locs-body').innerHTML = `<div class="tbl-wrap"><table>
+      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Wing</th><th>Floor</th><th>Status</th></tr></thead>
+      <tbody>${_navLocations.map(l=>`<tr>
+        <td>${l.location_id}</td><td>${l.name}</td><td>${l.category||'—'}</td>
+        <td>${l.wing_name||'—'}</td><td>${l.floor_level??'—'}</td>
+        <td><span class="avail-dot ${l.is_active?'on':'off'}"></span>${l.is_active?'Available':'Unavailable'}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+};
+
+let _navLocations = [];
+function _populateNavDropdowns(locs, excludeId) {
+  const fromSel = $id('nav-from');
+  const toSel   = $id('nav-to');
+  if (!fromSel || !toSel) return;
+  const fromVal = fromSel.value;
+  toSel.innerHTML = '<option value="">— select room —</option>';
+  locs.forEach(l => {
+    if (String(l.location_id) !== String(excludeId)) {
+      const o = document.createElement('option');
+      o.value = l.location_id;
+      o.textContent = `${l.name}${l.category?' ('+l.category+')':''}`;
+      toSel.appendChild(o);
+    }
+  });
+  if (fromSel.options.length <= 1) {
+    fromSel.innerHTML = '<option value="">— select room —</option>';
+    locs.forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.location_id;
+      o.textContent = `${l.name}${l.category?' ('+l.category+')':''}`;
+      fromSel.appendChild(o);
+    });
+    fromSel.value = fromVal;
+  }
+}
+function updateNavToOptions() {
+  const fromId = $id('nav-from')?.value;
+  _populateNavDropdowns(_navLocations, fromId || null);
+}
+
+async function loadNavRoute() {
+  const from = $id('nav-from').value;
+  const to   = $id('nav-to').value;
+  const el   = $id('nav-result');
+  if (!from||!to) { el.innerHTML='<div class="alert alert-warn">Select both From and To rooms.</div>'; return; }
+  if (from===to)  { el.innerHTML='<div class="alert alert-warn">From and To must be different rooms.</div>'; return; }
+  el.innerHTML='<span class="spinner"></span>';
+  const r = await apiFetch(`/navigate?from_id=${from}&to_id=${to}`);
+  const d = await r.json();
+  if (!r.ok) { el.innerHTML=`<div class="alert alert-danger">${d.detail||'Route not found.'}</div>`; return; }
+  const steps = d.path||[];
+  el.innerHTML=`<div class="card"><b>Route (${steps.length} steps):</b><ol style="margin-top:.5rem;padding-left:1.3rem">
+    ${steps.map(s=>`<li style="padding:.2rem 0">${s.name} <span class="badge badge-grey">${s.category||''}</span></li>`).join('')}
+  </ol></div>`;
+}
+
+/* ── Lost & Found ───────────────────────────────────────────────────── */
+PANES.lostfound = async mc => {
+  mc.innerHTML = `<h2>🔍 Lost &amp; Found</h2>
+  <div class="card">
+    <div class="card-title">Report Item</div>
+    <div class="form-row">
+      <div class="form-field"><label>Item Name *</label><input id="lf-name" placeholder="e.g. Black Wallet"/></div>
+      <div class="form-field"><label>Status</label>
+        <select id="lf-status"><option value="Lost">Lost</option><option value="Found">Found</option></select>
+      </div>
+      <div class="form-field"><label>Location Last Seen (ID)</label><input id="lf-loc" type="number"/></div>
+    </div>
+    <div class="form-field"><label>Description</label><textarea id="lf-desc" rows="2" placeholder="Details…"></textarea></div>
+    <div class="form-actions"><button class="btn btn-accent btn-sm" onclick="submitLostFound()">📤 Submit Report</button></div>
+    <div id="lf-msg"></div>
+  </div>
+  <div class="card" id="lf-list-card">
+    <div class="card-title">📋 Reports</div>
+    <div id="lf-list"><span class="spinner"></span></div>
+  </div>`;
+  loadLFList();
+};
+async function loadLFList() {
+  const r = await apiFetch('/items');
+  const d = await r.json();
+  const items = d.items||[];
+  const isSAC = _user.role==='sac'||_user.role==='admin';
+  const isAdmin = _user.role==='admin';
+  $id('lf-list').innerHTML = items.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>#</th><th>Item</th><th>Status</th><th>Description</th><th>Date</th>${isSAC?'<th>Action</th>':''}</tr></thead>
+    <tbody>${items.map(it=>`<tr>
+      <td>${it.item_id}</td><td>${it.item_name}</td>
+      <td>${badge(it.status, it.status==='Closed'?'badge-grey':it.status==='Lost'?'badge-red':'badge-green')}</td>
+      <td>${it.description||'—'}</td>
+      <td>${it.created_at?new Date(it.created_at).toLocaleDateString():'—'}</td>
+      ${isSAC?`<td>${it.status!=='Closed'
+        ?`<button class="btn btn-sm btn-danger" onclick="closeLFItem(${it.item_id})">Close</button>`
+        :(isAdmin?`<button class="btn btn-sm btn-ghost" onclick="viewClosurePhoto(${it.item_id})">📷 View Photo</button>`+badge('Closed','badge-grey'):badge('Closed','badge-grey'))
+      }</td>`:''}`
+    ).join('')}</tbody></table></div>` : '<p style="color:var(--muted)">No reports found.</p>';
+}
+async function submitLostFound() {
+  const body = {
+    item_name:   $id('lf-name').value.trim(),
+    status:      $id('lf-status').value,
+    description: $id('lf-desc').value.trim(),
+    location_last_seen: $id('lf-loc').value ? parseInt($id('lf-loc').value) : null,
+  };
+  if (!body.item_name) { $id('lf-msg').innerHTML='<div class="alert alert-warn">Item name required.</div>'; return; }
+  const r = await apiFetch('/items/report', {method:'POST', body:JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { $id('lf-msg').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`; return; }
+  $id('lf-msg').innerHTML='<div class="alert alert-success">✓ Report submitted.</div>';
+  ['lf-name','lf-desc','lf-loc'].forEach(i=>$id(i).value='');
+  loadLFList();
+}
+async function closeLFItem(id) {
+  // Open webcam capture modal — live photo required as proof
+  openModal('📷 Close Item — Live Photo Required',`
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:.8rem">A live webcam photo is required to close this report. The photo will be stored and is only accessible to admin users.</p>
+    <div style="text-align:center">
+      <video id="lf-video" autoplay playsinline style="width:100%;max-width:320px;border-radius:8px;border:2px solid var(--g)"></video>
+      <canvas id="lf-canvas" style="display:none"></canvas>
+      <div id="lf-photo-preview" style="margin-top:.6rem"></div>
+    </div>
+    <div id="lf-cam-msg" style="margin-top:.5rem"></div>`,
+    `<button class="btn btn-accent btn-sm" id="lf-capture-btn" onclick="captureLFPhoto()">📷 Capture Photo</button>
+     <button class="btn btn-danger btn-sm" id="lf-confirm-close-btn" style="display:none" onclick="confirmCloseLF(${id})">✓ Confirm Close</button>
+     <button class="btn btn-ghost btn-sm" onclick="stopLFCam();closeModal()">Cancel</button>`
+  );
+  // Start webcam
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    const video = $id('lf-video');
+    video._stream = stream;
+    video.srcObject = stream;
+  } catch(e) {
+    $id('lf-cam-msg').innerHTML='<div class="alert alert-danger">Cannot access camera: '+e.message+'</div>';
+  }
+}
+function stopLFCam() {
+  const video = $id('lf-video');
+  if (video && video._stream) {
+    video._stream.getTracks().forEach(t=>t.stop());
+  }
+}
+function captureLFPhoto() {
+  const video = $id('lf-video');
+  const canvas = $id('lf-canvas');
+  if (!video||!canvas) return;
+  canvas.width  = video.videoWidth  || 320;
+  canvas.height = video.videoHeight || 240;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+  $id('lf-photo-preview').innerHTML = `<img src="${dataUrl}" style="max-width:320px;border-radius:8px;border:2px solid var(--g);margin-top:.4rem"/>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:.3rem">Photo captured. Click <b>Confirm Close</b> to proceed.</p>`;
+  $id('lf-capture-btn').textContent = '🔄 Retake';
+  $id('lf-confirm-close-btn').style.display = '';
+  canvas._dataUrl = dataUrl;
+}
+async function confirmCloseLF(id) {
+  const canvas = $id('lf-canvas');
+  if (!canvas || !canvas._dataUrl) { showToastWarn('Please capture a photo first.'); return; }
+  const r = await apiFetch(`/items/${id}/close`, {
+    method:'PATCH',
+    body: JSON.stringify({closure_photo: canvas._dataUrl})
+  });
+  const d = await r.json();
+  if (!r.ok) { $id('lf-cam-msg').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`; return; }
+  stopLFCam();
+  closeModal();
+  showToastSuccess('Item marked as Closed.');
+  loadLFList();
+}
+
+async function viewClosurePhoto(id) {
+  const r = await apiFetch(`/items/${id}/closure-photo`);
+  if (!r||!r.ok) { showToastError('Could not load photo.'); return; }
+  const d = await r.json();
+  openModal('📷 Closure Proof Photo',
+    d.closure_photo
+      ? `<img src="${d.closure_photo}" style="width:100%;border-radius:8px;border:2px solid var(--g)"/>`
+      : '<p class="alert alert-warn">No photo was captured for this closure.</p>'
+  );
+}
+
+/* ── Faculty (Admin + DC view) ──────────────────────────────────────── */
+PANES.faculty = async mc => {
+  mc.innerHTML = `<h2>👥 Faculty Directory</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="facTab(this,'fac-teachers')">Teachers</button>
+    <button class="tab-btn" onclick="facTab(this,'fac-clerical')">Clerical Staff</button>
+  </div>
+  <div id="fac-teachers"></div>
+  <div id="fac-clerical" style="display:none"></div>`;
+  loadFacTeachers();
+};
+function facTab(btn, pane) {
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['fac-teachers','fac-clerical'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if (pane==='fac-teachers' && !$id('fac-teachers').innerHTML) loadFacTeachers();
+  if (pane==='fac-clerical' && !$id('fac-clerical').innerHTML) loadFacClerical();
+}
+async function loadFacTeachers() {
+  $id('fac-teachers').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/staff?role=teacher');
+  const d=await r.json();
+  const users=(d.staff||[]).filter(u=>u.role==='teacher');
+  $id('fac-teachers').innerHTML=`<div class="card"><div class="card-title">Teachers (${users.length})</div>
+  ${users.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Status</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${u.name}</td><td>${u.email}</td>
+      <td>${u.department||'—'}</td>
+      <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
+    </tr>`).join('')}</tbody></table></div>`
+    :'<p style="color:var(--muted)">No teachers found.</p>'}</div>`;
+}
+async function loadFacClerical() {
+  $id('fac-clerical').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/staff');
+  const d=await r.json();
+  const users=(d.staff||[]).filter(u=>['head_clerk','sac','degree_coordinator'].includes(u.role));
+  $id('fac-clerical').innerHTML=`<div class="card"><div class="card-title">Clerical & Administrative Staff (${users.length})</div>
+  ${users.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${u.name}</td><td>${u.email}</td>
+      <td>${badge(fmtRole(u.role),'badge-blue')}</td>
+      <td>${u.department||'—'}</td>
+      <td>${badge(u.is_active?'Active':'Inactive',u.is_active?'badge-green':'badge-red')}</td>
+    </tr>`).join('')}</tbody></table></div>`
+    :'<p style="color:var(--muted)">No clerical staff found.</p>'}</div>`;
+}
+function escHtml(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+}
+
+/* ── Admin Panel ────────────────────────────────────────────────────── */
+PANES.admin_panel = async mc => {
+  mc.innerHTML = `<h2>⚙ Admin Panel</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="apTab(this,'ap-signups')">Signup Requests</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-staff')">Staff Management</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-mcr')">Mark Change Requests</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-course-req')">Course Requests</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-enroll-req')">Enrollment Requests</button>
+    <button class="tab-btn" onclick="apTab(this,'ap-settings')">⚙ Settings</button>
+  </div>
+  <div id="ap-signups"></div>
+  <div id="ap-staff"      style="display:none"></div>
+  <div id="ap-mcr"        style="display:none"></div>
+  <div id="ap-course-req" style="display:none"></div>
+  <div id="ap-enroll-req" style="display:none"></div>
+  <div id="ap-settings"   style="display:none"></div>`;
+  loadSignupRequests();
+};
+function apTab(btn, pane) {
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['ap-signups','ap-staff','ap-mcr','ap-course-req','ap-enroll-req','ap-settings'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if (pane==='ap-signups'    && !$id('ap-signups').innerHTML)    loadSignupRequests();
+  if (pane==='ap-staff'      && !$id('ap-staff').innerHTML)      loadStaffMgmt();
+  if (pane==='ap-mcr'        && !$id('ap-mcr').innerHTML)        loadMarkChangeRequests();
+  if (pane==='ap-course-req' && !$id('ap-course-req').innerHTML) loadAdminCourseRequests();
+  if (pane==='ap-enroll-req' && !$id('ap-enroll-req').innerHTML) loadAdminEnrollRequests();
+  if (pane==='ap-settings')                                       loadAdminSettings();
+  if (pane==='ap-mcr') loadMarkChangeRequests();
+}
+async function loadSignupRequests() {
+  $id('ap-signups').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/signup-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(r=>r.status==='pending');
+  $id('ap-signups').innerHTML = `<div class="card"><div class="card-title">Pending Requests (${reqs.length})</div>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('su-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('su-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveSignups()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectSignups()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" id="su-chk-all" onchange="toggleAll('su-chk',this)"/></th><th>Name</th><th>Email</th><th>Role</th><th>Dept</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="su-chk" value="${q.request_id}"/></td>
+      <td>${q.name}</td><td>${q.email}</td><td>${badge(fmtRole(q.role_requested),'badge-blue')}</td>
+      <td>${q.department||'—'}</td>
+      <td>${new Date(q.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="approveSignup(${q.request_id})">Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="rejectSignup(${q.request_id})">Reject</button>
+      </td></tr>`).join('')}</tbody></table></div>`:'<p style="color:var(--muted)">No pending requests.</p>'}</div>`;
+}
+async function approveSignup(id){
+  const r=await apiFetch(`/admin/signup-requests/${id}/approve`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+async function rejectSignup(id){
+  if(!confirm('Reject this request?'))return;
+  const r=await apiFetch(`/admin/signup-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+function toggleAll(cls, cb) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=cb.checked); }
+function bulkSelectAll(cls) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=true); }
+function bulkDeselectAll(cls) { document.querySelectorAll('.'+cls).forEach(c=>c.checked=false); }
+function getChecked(cls) { return [...document.querySelectorAll('.'+cls+':checked')].map(c=>parseInt(c.value)); }
+async function bulkApproveSignups(){
+  const ids=getChecked('su-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/signup-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+async function bulkRejectSignups(){
+  const ids=getChecked('su-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} requests?`))return;
+  const r=await apiFetch('/admin/signup-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSignupRequests();
+}
+async function loadStaffMgmt() {
+  $id('ap-staff').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/staff');
+  const d=await r.json();
+  const users=d.staff||[];
+  $id('ap-staff').innerHTML=`<div class="card"><div class="card-title">Portal Users (${users.length})</div>
+  <div style="margin-bottom:.6rem"><button class="btn btn-primary btn-sm" onclick="openAddStaffModal()">➕ Add User</button></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Dept</th><th>Active</th><th>Actions</th></tr></thead>
+    <tbody>${users.map(u=>`<tr>
+      <td>${u.name}</td><td>${u.email}</td><td>${badge(fmtRole(u.role),'badge-blue')}</td>
+      <td>${u.department||'—'}</td>
+      <td>${badge(u.is_active?'Yes':'No',u.is_active?'badge-green':'badge-red')}</td>
+      <td>
+        <button class="btn btn-sm btn-ghost" onclick="openEditStaffModal(${u.user_id},'${escHtml(u.name)}','${escHtml(u.email)}','${u.role}',${u.is_active},'${escHtml(u.department||'')}')">Edit</button>
+        ${u.is_active
+          ? `<button class="btn btn-sm btn-danger" onclick="deleteStaff(${u.user_id})">Deactivate</button>`
+          : `<button class="btn btn-sm btn-primary" onclick="reactivateStaff(${u.user_id})">Activate</button>`}
+      </td></tr>`).join('')}</tbody></table></div></div>`;
+}
+const DEPT_OPTIONS = ['','IT','CS','SE','DS','AI'];
+function deptSelect(id,val=''){
+  return `<select id="${id}"><option value="">— No Dept —</option>${DEPT_OPTIONS.filter(d=>d).map(d=>`<option value="${d}" ${d===val?'selected':''}>${d}</option>`).join('')}</select>`;
+}
+function openAddStaffModal(){
+  openModal('Add User',`
+    <div class="form-field"><label>Full Name</label><input id="as-name"/></div>
+    <div class="form-field"><label>Email</label><input id="as-email" type="email"/></div>
+    <div class="form-field"><label>Password</label><input id="as-pass" type="password"/></div>
+    <div class="form-field"><label>Role</label>
+      <select id="as-role">
+        <option value="student">Student</option><option value="teacher">Teacher</option>
+        <option value="sac">SAC Officer</option><option value="head_clerk">Head Clerk</option>
+        <option value="degree_coordinator">Degree Coordinator</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="form-field"><label>Department</label>${deptSelect('as-dept')}</div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addStaff()">Add</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function addStaff(){
+  const payload={email:$id('as-email').value.trim(),name:$id('as-name').value.trim(),
+    password:$id('as-pass').value,role:$id('as-role').value,
+    department:$id('as-dept').value||null};
+  if(!payload.name||!payload.email||!payload.password){alert('Fill all fields.');return;}
+  const r=await apiFetch('/admin/staff',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadStaffMgmt();
+}
+function openEditStaffModal(id,name,email,role,active,dept=''){
+  openModal('Edit User',`
+    <div class="form-field"><label>Name</label><input id="es-name" value="${escHtml(name)}"/></div>
+    <div class="form-field"><label>Email</label><input id="es-email" value="${escHtml(email)}"/></div>
+    <div class="form-field"><label>New Password (leave blank to keep)</label><input id="es-pass" type="password"/></div>
+    <div class="form-field"><label>Role</label>
+      <select id="es-role">
+        <option value="student" ${role==='student'?'selected':''}>Student</option>
+        <option value="teacher" ${role==='teacher'?'selected':''}>Teacher</option>
+        <option value="sac"     ${role==='sac'?'selected':''}>SAC Officer</option>
+        <option value="head_clerk" ${role==='head_clerk'?'selected':''}>Head Clerk</option>
+        <option value="degree_coordinator" ${role==='degree_coordinator'?'selected':''}>Degree Coordinator</option>
+        <option value="admin"  ${role==='admin'?'selected':''}>Admin</option>
+      </select>
+    </div>
+    <div class="form-field"><label>Department</label>${deptSelect('es-dept',dept)}</div>
+    <div class="form-field"><label>Active</label>
+      <select id="es-active">
+        <option value="true"  ${active?'selected':''}>Yes</option>
+        <option value="false" ${!active?'selected':''}>No</option>
+      </select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="saveStaff(${id})">Save</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function saveStaff(id){
+  const payload={};
+  const n=$id('es-name').value.trim(),e=$id('es-email').value.trim(),p=$id('es-pass').value;
+  if(n) payload.name=n; if(e) payload.email=e; if(p) payload.password=p;
+  payload.role=$id('es-role').value;
+  payload.department=$id('es-dept').value||null;
+  payload.is_active=$id('es-active').value==='true';
+  const r=await apiFetch(`/admin/staff/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadStaffMgmt();
+}
+async function deleteStaff(id){
+  if(!confirm('Deactivate this user?'))return;
+  const r=await apiFetch(`/admin/staff/${id}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadStaffMgmt();
+}
+async function reactivateStaff(id){
+  if(!confirm('Re-activate this user?'))return;
+  const r=await apiFetch(`/admin/staff/${id}/reactivate`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadStaffMgmt();
+}
+async function loadMarkChangeRequests(){
+  $id('ap-mcr').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/marks/change-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(q=>q.status==='pending');
+  $id('ap-mcr').innerHTML=`<div class="card"><div class="card-title">Pending Mark Change Requests (${reqs.length})</div>
+  ${reqs.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Teacher</th><th>Course</th><th>Student</th><th>Category</th><th>Title</th><th>Current</th><th>Requested</th><th>Reason</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td>${q.teacher_name}</td><td>${q.course_code}</td><td>${q.student_name}</td>
+      <td>${badge(q.category,'badge-blue')}</td><td>${q.record_title}</td>
+      <td>${q.current_marks??'–'}/${q.current_total??'–'}</td>
+      <td><b>${q.new_marks_obtained??'–'}</b>${q.new_total_marks!=null?'/'+q.new_total_marks:''}</td>
+      <td style="max-width:180px;white-space:normal">${q.reason}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="acceptMCR(${q.request_id})">✓ Accept</button>
+        <button class="btn btn-sm btn-danger"  onclick="rejectMCR(${q.request_id})">✗ Reject</button>
+      </td></tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No pending requests.</p>`}</div>`;
+}
+async function acceptMCR(id){
+  if(!confirm('Accept this request and update marks?'))return;
+  const r=await apiFetch(`/admin/mark-change-requests/${id}/accept`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadMarkChangeRequests();
+}
+async function rejectMCR(id){
+  if(!confirm('Reject this request?'))return;
+  const r=await apiFetch(`/admin/mark-change-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadMarkChangeRequests();
+}
+async function loadAdminCourseRequests(){
+  $id('ap-course-req').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/course-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(q=>q.status==='pending');
+  $id('ap-course-req').innerHTML=`<div class="card"><div class="card-title">Pending Course Requests (${reqs.length})</div>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('cr-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('cr-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveCourseReqs()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectCourseReqs()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('cr-chk',this)"/></th><th>Code</th><th>Name</th><th>Teacher</th><th>Section</th><th>Semester</th><th>By</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="cr-chk" value="${q.request_id}"/></td>
+      <td>${q.code}</td><td>${q.name}</td><td>${q.teacher_name}</td>
+      <td>${q.section||'–'}</td><td>${q.semester||'–'}</td><td>${q.clerk_name}</td>
+      <td>${new Date(q.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="approveCourseReq(${q.request_id})">Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="rejectCourseReq(${q.request_id})">Reject</button>
+      </td></tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No pending course requests.</p>`}</div>`;
+}
+async function approveCourseReq(id){
+  const r=await apiFetch(`/admin/course-requests/${id}/approve`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
+async function rejectCourseReq(id){
+  if(!confirm('Reject this course request?'))return;
+  const r=await apiFetch(`/admin/course-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
+async function bulkApproveCourseReqs(){
+  const ids=getChecked('cr-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/course-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
+async function bulkRejectCourseReqs(){
+  const ids=getChecked('cr-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} course requests?`))return;
+  const r=await apiFetch('/admin/course-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminCourseRequests();
+}
+async function loadAdminEnrollRequests(){
+  $id('ap-enroll-req').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/enrollment-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(q=>q.status==='pending');
+  $id('ap-enroll-req').innerHTML=`<div class="card"><div class="card-title">Pending Enrollment Requests (${reqs.length})</div>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('er-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('er-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="bulkApproveEnrollReqs()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="bulkRejectEnrollReqs()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('er-chk',this)"/></th><th>Student</th><th>Email</th><th>Course</th><th>Teacher</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="er-chk" value="${q.request_id}"/></td>
+      <td>${q.student_name}</td><td>${q.student_email}</td>
+      <td>${q.course_code} — ${q.course_name}</td><td>${q.teacher_name}</td>
+      <td>${new Date(q.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="approveEnrollReq(${q.request_id})">Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="rejectEnrollReq(${q.request_id})">Reject</button>
+      </td></tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No pending enrollment requests.</p>`}</div>`;
+}
+async function approveEnrollReq(id){
+  const r=await apiFetch(`/admin/enrollment-requests/${id}/approve`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+async function rejectEnrollReq(id){
+  if(!confirm('Reject this enrollment request?'))return;
+  const r=await apiFetch(`/admin/enrollment-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+async function bulkApproveEnrollReqs(){
+  const ids=getChecked('er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/admin/enrollment-requests/bulk-approve',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+async function bulkRejectEnrollReqs(){
+  const ids=getChecked('er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} enrollment requests?`))return;
+  const r=await apiFetch('/admin/enrollment-requests/bulk-reject',{method:'POST',body:JSON.stringify({ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadAdminEnrollRequests();
+}
+
+/* ── Admin Settings ──────────────────────────────────────────────────── */
+async function loadAdminSettings() {
+  $id('ap-settings').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/admin/settings');
+  const d=await r.json();
+  const s=d.settings||{};
+  $id('ap-settings').innerHTML=`
+  <div class="card">
+    <div class="card-title">⚙ Portal Settings</div>
+    <div class="tab-bar" style="margin-bottom:1rem">
+      <button class="tab-btn active" onclick="setTab(this,'set-general')">General</button>
+      <button class="tab-btn" onclick="setTab(this,'set-appearance')">Appearance</button>
+      <button class="tab-btn" onclick="setTab(this,'set-access')">Access</button>
+    </div>
+    <!-- General -->
+    <div id="set-general">
+      <div class="form-row">
+        <div class="form-field"><label>Portal Name</label><input id="set-name" value="${escHtml(s.portal_name||'SCNRO – PUCIT')}"/></div>
+        <div class="form-field">
+          <label>Logo (upload or paste URL)</label>
+          <input id="set-logo" value="${escHtml(s.logo_url||'')}" placeholder="https://… or upload below"/>
+          <input type="file" id="set-logo-file" accept="image/*" style="margin-top:.3rem;font-size:.82rem" onchange="previewLogoUpload(this)"/>
+          ${s.logo_url?`<img id="set-logo-preview" src="${escHtml(s.logo_url)}" style="margin-top:.4rem;height:48px;border-radius:50%;border:2px solid var(--g)" onerror="this.style.display='none'"/>`:
+          '<img id="set-logo-preview" style="display:none;margin-top:.4rem;height:48px;border-radius:50%;border:2px solid var(--g)"/>'}
+        </div>
+      </div>
+    </div>
+    <!-- Appearance -->
+    <div id="set-appearance" style="display:none">
+      <div class="form-row">
+        <div class="form-field"><label>Theme Preset</label>
+          <select id="set-theme" onchange="previewTheme()">
+            <option value="green"  ${s.theme==='green'||!s.theme?'selected':''}>Green (PUCIT)</option>
+            <option value="blue"   ${s.theme==='blue'?'selected':''}>Blue</option>
+            <option value="dark"   ${s.theme==='dark'?'selected':''}>Dark</option>
+            <option value="purple" ${s.theme==='purple'?'selected':''}>Purple</option>
+            <option value="red"    ${s.theme==='red'?'selected':''}>Red</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Font Family</label>
+          <select id="set-font">
+            <option value="segoe"  ${s.font==='segoe'||!s.font?'selected':''}>Segoe UI (default)</option>
+            <option value="roboto" ${s.font==='roboto'?'selected':''}>Roboto</option>
+            <option value="inter"  ${s.font==='inter'?'selected':''}>Inter</option>
+            <option value="mono"   ${s.font==='mono'?'selected':''}>Monospace</option>
+            <option value="serif"  ${s.font==='serif'?'selected':''}>Serif</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Primary Color (overrides theme)</label>
+          <input type="color" id="set-primary-color" value="${s.primary_color||'#006633'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+          <span style="font-size:.78rem;color:var(--muted);margin-left:.4rem">Leave as theme default if unchanged</span>
+        </div>
+        <div class="form-field"><label>Accent Color</label>
+          <input type="color" id="set-accent-color" value="${s.accent_color||'#C9A227'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+        </div>
+        <div class="form-field"><label>Background Color</label>
+          <input type="color" id="set-bg-color" value="${s.bg_color||'#f4f6f8'}" style="height:36px;width:80px;padding:2px;border-radius:4px;border:1px solid var(--border)"/>
+        </div>
+      </div>
+      <div style="margin-top:.6rem">
+        <button class="btn btn-ghost btn-sm" onclick="previewTheme()">👁 Preview</button>
+      </div>
+    </div>
+    <!-- Access -->
+    <div id="set-access" style="display:none">
+      <div class="form-row">
+        <div class="form-field"><label>Portal Availability</label>
+          <select id="set-avail">
+            <option value="true"  ${s.portal_available!=='false'?'selected':''}>Available</option>
+            <option value="false" ${s.portal_available==='false'?'selected':''}>Unavailable (Maintenance)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-field"><label>Unavailable Message</label>
+        <textarea id="set-unavail-msg" rows="2">${escHtml(s.unavailable_message||'')}</textarea>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:1rem">
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+    <div id="set-msg-res"></div>
+  </div>
+  <div class="card" style="border-top:3px solid var(--danger)">
+    <div class="card-title" style="color:var(--danger)">🗑 Danger Zone</div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:.8rem">Erase all application data (rooms, users, courses, sections, lost & found). Admin accounts are preserved.</p>
+    <button class="btn btn-danger btn-sm" onclick="resetAllData()">🗑 Erase All Data</button>
+  </div>`;
+}
+function setTab(btn, pane) {
+  btn.closest('.card').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['set-general','set-appearance','set-access'].forEach(id=>{
+    const el=$id(id); if(el) el.style.display='none';
+  });
+  const el=$id(pane); if(el) el.style.display='';
+}
+function previewLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    $id('set-logo').value = e.target.result;  // set data URL as the logo_url
+    const preview = $id('set-logo-preview');
+    if (preview) { preview.src = e.target.result; preview.style.display = ''; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewTheme() {
+  applyTheme({
+    theme: $id('set-theme')?.value,
+    font: $id('set-font')?.value,
+    primary_color: $id('set-primary-color')?.value,
+    accent_color: $id('set-accent-color')?.value,
+    bg_color: $id('set-bg-color')?.value,
+    portal_name: $id('set-name')?.value,
+    logo_url: $id('set-logo')?.value,
+  });
+}
+async function saveSettings(){
+  const settings={
+    portal_name: $id('set-name').value.trim(),
+    logo_url: $id('set-logo').value.trim(),
+    theme: $id('set-theme').value,
+    font: $id('set-font').value,
+    primary_color: $id('set-primary-color').value,
+    accent_color: $id('set-accent-color').value,
+    bg_color: $id('set-bg-color').value,
+    portal_available: $id('set-avail').value,
+    unavailable_message: $id('set-unavail-msg').value.trim(),
+  };
+  const r=await apiFetch('/admin/settings',{method:'PUT',body:JSON.stringify({settings})});
+  const d=await r.json();
+  if(!r.ok){$id('set-msg-res').innerHTML=`<div class="alert alert-danger">${d.detail}</div>`;return;}
+  applyTheme(settings);
+  $id('set-msg-res').innerHTML='<div class="alert alert-success">✓ Settings saved and applied.</div>';
+  showToastSuccess('Settings saved and applied.');
+}
+async function resetAllData(){
+  if(!confirm('⚠️ This will DELETE ALL data. Admin accounts will be preserved. Type "RESET" to confirm.'))return;
+  const c=prompt('Type RESET to confirm:');
+  if(c!=='RESET')return;
+  const r=await apiFetch('/admin/reset-data',{method:'POST'});
+  const d=await r.json();
+  if(!r.ok){alert(d.detail);return;}
+  alert('✓ All data erased.');
+  loadAdminSettings();
+}
+
+/* ── Marks Management (Teacher & Admin) ─────────────────────────────── */
+PANES.marks_mgmt = async mc => {
+  mc.innerHTML=`<h2>📊 Marks Management</h2>
+  <div class="card" style="margin-bottom:.5rem">
+    <div style="font-size:.82rem;color:var(--muted)">
+      <b>Grading weights:</b>
+      <span class="badge badge-blue" style="margin-left:.4rem">Sessionals 25%</span>
+      <span class="badge badge-orange" style="margin-left:.3rem">Mid 35%</span>
+      <span class="badge badge-green" style="margin-left:.3rem">Final 40%</span>
+      &nbsp;—&nbsp; Sessionals = Attendance + Quiz + Activity
+    </div>
+  </div>
+  <div class="card" id="mgt-courses-card">
+    <div class="card-title">Select Course</div>
+    <div id="mgt-course-list"><span class="spinner"></span></div>
+  </div>
+  <div id="mgt-detail"></div>`;
+  const r=await apiFetch('/courses');
+  const d=await r.json();
+  const courses=d.courses||[];
+  if(!courses.length){$id('mgt-course-list').innerHTML='<p style="color:var(--muted)">No courses found.</p>';return;}
+  $id('mgt-course-list').innerHTML=courses.map(c=>
+    `<div class="course-pill" style="cursor:pointer" onclick="loadCourseMarks(${c.course_id},'${escHtml(c.code)}','${escHtml(c.name)}')">
+      ${c.code} – ${c.name} <small style="opacity:.7">${c.section||''}</small>
+    </div>`
+  ).join('');
+};
+
+async function loadCourseMarks(courseId, code, name) {
+  const det = $id('mgt-detail');
+  det.innerHTML=`<div class="card"><span class="spinner"></span> Loading…</div>`;
+  const [studR, marksR] = await Promise.all([
+    apiFetch(`/courses/${courseId}/students`).then(r=>r.json()),
+    apiFetch(`/courses/${courseId}/marks`).then(r=>r.json()),
+  ]);
+  const students = studR.students||[];
+  const allMarks = marksR.marks||[];
+  const locks    = marksR.locks||{};
+
+  // Tab groups: Sessionals (25%), Mid (35%), Final (40%)
+  const TAB_GROUPS = [
+    {id:'sessionals', label:'Sessionals (25%)', cats:['attendance','quiz','activity'], weight:0.25},
+    {id:'mid',        label:'Mid (35%)',         cats:['mid'],                          weight:0.35},
+    {id:'final',      label:'Final (40%)',        cats:['final'],                        weight:0.40},
+  ];
+
+  /** Calculate weighted score for a student */
+  function calcWeighted(student) {
+    let total = 0;
+    for (const grp of TAB_GROUPS) {
+      let grpObt = 0, grpTot = 0;
+      for (const cat of grp.cats) {
+        const catMarks = allMarks.filter(m=>m.category===cat);
+        // Find max total_marks seen in this category (set by teacher)
+        const maxTot = catMarks.reduce((acc, m)=> m.total_marks ? Math.max(acc, m.total_marks) : acc, 0);
+        const studentMarks = catMarks.filter(m=>m.student_id===student.student_id);
+        const obtSum = studentMarks.reduce((acc, m)=> acc + (m.marks_obtained||0), 0);
+        grpObt += obtSum;
+        grpTot += maxTot;
+      }
+      if (grpTot > 0) {
+        total += (grpObt / grpTot) * grp.weight * 100;
+      }
+    }
+    return total;
+  }
+
+  function renderCourseDetail() {
+    let html = `<div class="card">
+      <div class="card-title">📋 ${code} – ${name}</div>
+      <div class="tab-bar" id="cat-tabs">
+        ${TAB_GROUPS.map((g,i)=>`<button class="tab-btn ${i===0?'active':''}" onclick="switchCatGroup(this,'grp-${g.id}')">${g.label}</button>`).join('')}
+        <button class="tab-btn" onclick="switchCatGroup(this,'grp-summary')">📊 Summary</button>
+      </div>`;
+
+    // Render each group's pane
+    TAB_GROUPS.forEach((grp, gi) => {
+      const isGroupLocked = grp.cats.every(cat => !!locks[cat]);
+      html += `<div id="grp-${grp.id}" style="${gi>0?'display:none':''}">`;
+
+      grp.cats.forEach(cat => {
+        const isLocked = !!locks[cat];
+        const catMarks = allMarks.filter(m=>m.category===cat);
+        html += `<div style="margin-bottom:1rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap">
+            <b style="text-transform:capitalize">${cat}</b>
+            ${isLocked ? `<span class="badge badge-gold">🔒 Finalized</span>
+              <button class="btn btn-sm btn-ghost" onclick="openMCRModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">📩 Request Change</button>`
+            : `<button class="btn btn-sm btn-accent" onclick="openAddMarkModal(${courseId},'${cat}',${JSON.stringify(students).replace(/"/g,'&quot;')})">➕ Add</button>
+               <button class="btn btn-sm btn-primary" onclick="finalizeCat(${courseId},'${cat}')">🔒 Finalize</button>`}
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Student</th><th>Title</th><th>Obtained</th><th>Total</th>${isLocked?'':'<th>Actions</th>'}</tr></thead>
+            <tbody>
+              ${students.map(s=>{
+                const m = catMarks.filter(x=>x.student_id===s.student_id);
+                if(!m.length) return `<tr><td>${s.name}</td><td colspan="3" style="color:var(--muted)">Not entered — counts as 0</td>${isLocked?'':'<td></td>'}</tr>`;
+                return m.map(mk=>`<tr>
+                  <td>${s.name}</td><td>${mk.title}</td>
+                  <td>${mk.marks_obtained??'—'}</td><td>${mk.total_marks??'—'}</td>
+                  ${isLocked?'':`<td>
+                    <button class="btn btn-sm btn-ghost" onclick="openEditMarkModal(${mk.record_id},'${escHtml(mk.title)}',${mk.marks_obtained??''},${mk.total_marks??''})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteMark(${mk.record_id},${courseId},'${code}','${name}')">Del</button>
+                  </td>`}
+                </tr>`).join('');
+              }).join('')}
+            </tbody>
+          </table></div>
+        </div>`;
+      });
+
+      // PDF buttons per group
+      html += `<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">
+        ${_user.role==='teacher'||_user.role==='admin' ? grp.cats.map(cat=>
+          `<button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'${cat}')">📄 ${cat.charAt(0).toUpperCase()+cat.slice(1)} PDF</button>`
+        ).join('') : ''}
+        ${_user.role==='teacher'||_user.role==='admin' ? `<button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>` : ''}
+      </div>`;
+      html += '</div>';
+    });
+
+    // Summary pane
+    html += `<div id="grp-summary" style="display:none">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+        ${_user.role==='teacher'||_user.role==='admin'?`
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'mid')">📄 Mid PDF</button>
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId},'final')">📄 Final PDF</button>
+          <button class="btn btn-sm btn-ghost" onclick="downloadPDF(${courseId})">📄 Full PDF</button>`:''}
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Student</th><th>Sessionals (25%)</th><th>Mid (35%)</th><th>Final (40%)</th><th>Total %</th><th>Grade</th></tr></thead>
+        <tbody>
+          ${students.map(s => {
+            const wt = calcWeighted(s);
+            let grade = 'F';
+            if (wt >= 90) grade = 'A+';
+            else if (wt >= 85) grade = 'A';
+            else if (wt >= 80) grade = 'A-';
+            else if (wt >= 75) grade = 'B+';
+            else if (wt >= 70) grade = 'B';
+            else if (wt >= 65) grade = 'B-';
+            else if (wt >= 60) grade = 'C+';
+            else if (wt >= 55) grade = 'C';
+            else if (wt >= 50) grade = 'D';
+            const gradeClass = wt>=60?'badge-green':wt>=50?'badge-orange':'badge-red';
+
+            // Per-group contribution
+            const grpContribs = TAB_GROUPS.map(grp => {
+              let obt=0, tot=0;
+              for(const cat of grp.cats){
+                const catMarks=allMarks.filter(m=>m.category===cat);
+                const maxT=catMarks.reduce((a,m)=>m.total_marks?Math.max(a,m.total_marks):a,0);
+                const sMarks=catMarks.filter(m=>m.student_id===s.student_id);
+                obt+=sMarks.reduce((a,m)=>a+(m.marks_obtained||0),0);
+                tot+=maxT;
+              }
+              return tot>0 ? `${obt.toFixed(1)}/${tot.toFixed(1)} (${(obt/tot*grp.weight*100).toFixed(1)}pts)` : '—';
+            });
+
+            return `<tr>
+              <td>${s.name}</td>
+              <td>${grpContribs[0]}</td>
+              <td>${grpContribs[1]}</td>
+              <td>${grpContribs[2]}</td>
+              <td><b>${wt.toFixed(1)}%</b></td>
+              <td>${badge(grade, gradeClass)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+    html += '</div>';
+    det.innerHTML = html;
+  }
+  renderCourseDetail();
+
+  // keep references for reload
+  det._reload = () => loadCourseMarks(courseId, code, name);
+}
+
+function switchCatGroup(btn, groupId) {
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('[id^="grp-"]').forEach(el => {
+    el.style.display = el.id === groupId ? '' : 'none';
+  });
+}
+
+function openAddMarkModal(courseId, cat, students){
+  openModal(`Add ${cat} mark`,`
+    <div class="form-field"><label>Student</label>
+      <select id="am-student">${students.map(s=>`<option value="${s.student_id}">${s.name}</option>`).join('')}</select>
+    </div>
+    <div class="form-field"><label>Title</label><input id="am-title" placeholder="e.g. Quiz 1"/></div>
+    <div class="form-field"><label>Marks Obtained</label><input id="am-obt" type="number" step="0.01"/></div>
+    <div class="form-field"><label>Total Marks</label><input id="am-tot" type="number" step="0.01"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="submitAddMark(${courseId},'${cat}')">Save</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function submitAddMark(courseId,cat){
+  const payload={
+    student_id:parseInt($id('am-student').value),
+    course_id:courseId, category:cat,
+    title:$id('am-title').value.trim(),
+    marks_obtained:$id('am-obt').value?parseFloat($id('am-obt').value):null,
+    total_marks:$id('am-tot').value?parseFloat($id('am-tot').value):null,
+  };
+  if(!payload.title){alert('Title required.');return;}
+  const r=await apiFetch('/marks',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal();
+  $id('mgt-detail')._reload && $id('mgt-detail')._reload();
+}
+
+function openEditMarkModal(recordId, title, obt, tot){
+  openModal('Edit Mark',`
+    <div class="form-field"><label>Title</label><input id="em-title" value="${escHtml(title)}"/></div>
+    <div class="form-field"><label>Marks Obtained</label><input id="em-obt" type="number" step="0.01" value="${obt}"/></div>
+    <div class="form-field"><label>Total Marks</label><input id="em-tot" type="number" step="0.01" value="${tot}"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="submitEditMark(${recordId})">Save</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function submitEditMark(recordId){
+  const payload={};
+  const t=$id('em-title').value.trim(),o=$id('em-obt').value,tt=$id('em-tot').value;
+  if(t) payload.title=t;
+  if(o!=='') payload.marks_obtained=parseFloat(o);
+  if(tt!=='') payload.total_marks=parseFloat(tt);
+  const r=await apiFetch(`/marks/${recordId}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal();
+  $id('mgt-detail')._reload && $id('mgt-detail')._reload();
+}
+
+async function deleteMark(recordId, courseId, code, name){
+  if(!confirm('Delete this mark?'))return;
+  const r=await apiFetch(`/marks/${recordId}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadCourseMarks(courseId,code,name);
+}
+
+async function finalizeCat(courseId,cat){
+  if(!confirm(`Finalize '${cat}'? This cannot be undone without admin approval.`))return;
+  const r=await apiFetch(`/courses/${courseId}/finalize/${cat}`,{method:'POST'});
+  const d=await r.json();
+  if(!r.ok){showToastError(d.detail||'Finalize failed.');return;}
+  showToastSuccess(`Category '${cat}' finalized.`);
+  $id('mgt-detail')._reload && $id('mgt-detail')._reload();
+}
+
+async function downloadPDF(courseId, category){
+  const token=_token;
+  const catParam = category ? `?category=${category}` : '';
+  try {
+    const r = await fetch(`${API}/courses/${courseId}/report.pdf${catParam}`,{headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok){
+      let msg = 'PDF error '+r.status;
+      try { const e=await r.json(); msg=e.detail||msg; } catch(_){}
+      showToastError('PDF download failed: '+msg);
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const suffix = category ? `_${category}` : '';
+    link.href = url;
+    link.download = `course_${courseId}${suffix}_result.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToastSuccess('PDF download started.');
+  } catch(e) {
+    showToastError('PDF download failed: '+e.message);
+  }
+}
+
+function openMCRModal(courseId, cat, students){
+  openModal(`Request Mark Change — ${cat}`,`
+    <div class="alert alert-warn">This category is finalized. You are requesting admin to update a mark.</div>
+    <div class="form-field"><label>Student</label>
+      <select id="mcr-student" onchange="loadCurrentMark(${courseId},'${cat}')">${students.map(s=>`<option value="${s.student_id}" data-name="${escHtml(s.name)}">${s.name}</option>`).join('')}</select>
+    </div>
+    <div id="mcr-current-info" class="alert alert-info" style="margin-top:.4rem">Select a student to see current mark.</div>
+    <div class="form-field" style="margin-top:.5rem"><label>Record to Change</label>
+      <select id="mcr-record"><option value="">— select after loading —</option></select>
+    </div>
+    <div class="form-field"><label>New Marks Obtained *</label><input id="mcr-new-obt" type="number" step="0.01"/></div>
+    <div class="form-field"><label>New Total Marks (optional)</label><input id="mcr-new-tot" type="number" step="0.01"/></div>
+    <div class="form-field"><label>Reason *</label><textarea id="mcr-reason" rows="3" placeholder="Explain why marks should change…"></textarea></div>`,
+    `<button class="btn btn-accent btn-sm" onclick="submitMCR(${courseId},'${cat}')">📩 Send Request</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+  loadCurrentMark(courseId, cat);
+}
+async function loadCurrentMark(courseId, cat){
+  const studId = $id('mcr-student').value;
+  const infoEl = $id('mcr-current-info');
+  const recEl  = $id('mcr-record');
+  if(!infoEl||!recEl) return;
+  infoEl.textContent='Loading…';
+  const r = await apiFetch(`/courses/${courseId}/marks`);
+  const d = await r.json();
+  const recs = (d.marks||[]).filter(m=>m.student_id===parseInt(studId)&&m.category===cat);
+  if(!recs.length){ infoEl.textContent='No marks in this category for selected student.'; recEl.innerHTML='<option>No records</option>'; return; }
+  recEl.innerHTML = recs.map(m=>`<option value="${m.record_id}">${m.title}: ${m.marks_obtained??'–'}/${m.total_marks??'–'}</option>`).join('');
+  const first=recs[0];
+  infoEl.innerHTML=`Current: <b>${first.title}</b> — ${first.marks_obtained??'–'} / ${first.total_marks??'–'}`;
+  $id('mcr-new-obt').value = first.marks_obtained??'';
+  $id('mcr-new-tot').value = first.total_marks??'';
+}
+async function submitMCR(courseId,cat){
+  const recId  = parseInt($id('mcr-record').value);
+  const newObt = parseFloat($id('mcr-new-obt').value);
+  const newTot = $id('mcr-new-tot').value ? parseFloat($id('mcr-new-tot').value) : null;
+  const reason = $id('mcr-reason').value.trim();
+  if(!recId||isNaN(newObt)||!reason){alert('Fill all required fields.');return;}
+  const payload={record_id:recId,new_marks_obtained:newObt,reason};
+  if(newTot!==null) payload.new_total_marks=newTot;
+  const r=await apiFetch('/marks/change-request',{method:'POST',body:JSON.stringify(payload)});
+  const d=await r.json();
+  if(!r.ok){alert(d.detail);return;}
+  closeModal();
+  alert('✓ Change request sent to admin.');
+}
+
+/* ── My Grades (Student) ─────────────────────────────────────────────── */
+PANES.my_grades = async mc => {
+  mc.innerHTML=`<h2>🎓 My Grades</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="grTab(this,'gr-grades')">My Grades</button>
+    <button class="tab-btn" onclick="grTab(this,'gr-enroll')">Enrollment Requests</button>
+  </div>
+  <div id="gr-grades"><span class="spinner"></span></div>
+  <div id="gr-enroll" style="display:none"></div>`;
+
+  // Load grades
+  const [coursesR, marksR] = await Promise.all([
+    apiFetch('/courses').then(r=>r.json()),
+    apiFetch('/marks/my').then(r=>r.json()),
+  ]);
+  const courses  = coursesR.courses||[];
+  const allMarks = marksR.marks||[];
+  if(!courses.length){ $id('gr-grades').innerHTML='<div class="alert alert-info">You are not enrolled in any courses.</div>'; }
+  else {
+    const CATS=['attendance','quiz','activity','mid','final'];
+    $id('gr-grades').innerHTML = courses.map(c=>{
+      const cMarks=allMarks.filter(m=>m.course_id===c.course_id);
+      return `<div class="card">
+        <div class="card-title">📚 ${c.code} – ${c.name}
+          <small style="font-weight:400;color:var(--muted)">
+            ${c.section?'· '+c.section+' ':''} ${c.semester?'· '+c.semester+' ':''} ${c.teacher_name?'· 👩‍🏫 '+c.teacher_name:''}
+          </small>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Category</th><th>Title</th><th>Marks</th><th>Total</th><th>%</th></tr></thead>
+          <tbody>${CATS.map(cat=>{
+            const catM=cMarks.filter(m=>m.category===cat);
+            if(!catM.length) return `<tr><td>${badge(cat,'badge-grey')}</td><td colspan="4" style="color:var(--muted)">Not uploaded</td></tr>`;
+            return catM.map(m=>{
+              const pct = m.total_marks ? ((m.marks_obtained/m.total_marks)*100).toFixed(1)+'%' : '—';
+              const pctNum = m.total_marks ? (m.marks_obtained/m.total_marks)*100 : null;
+              const cls = pctNum==null?'badge-grey':pctNum>=60?'badge-green':pctNum>=40?'badge-orange':'badge-red';
+              return `<tr>
+                <td>${badge(cat,'badge-blue')}</td><td>${m.title}</td>
+                <td>${m.marks_obtained??'—'}</td><td>${m.total_marks??'—'}</td>
+                <td>${badge(pct,cls)}</td>
+              </tr>`;
+            }).join('');
+          }).join('')}</tbody>
+        </table></div>
+      </div>`;
+    }).join('');
+  }
+};
+function grTab(btn,pane){
+  document.querySelectorAll('.tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['gr-grades','gr-enroll'].forEach(id=>$id(id).style.display='none');
+  $id(pane).style.display='';
+  if(pane==='gr-enroll'){
+    $id('gr-enroll').innerHTML=`<div class="card">
+      <div class="card-title">Enrollment Requests</div>
+      <div style="margin-bottom:.6rem"><button class="btn btn-primary btn-sm" onclick="openEnrollReqModal()">➕ Request Enrollment</button></div>
+      <div id="enroll-req-body"><span class="spinner"></span></div>
+    </div>`;
+    loadEnrollmentRequests();
+  }
+}
+
+/* ── Room Management (Head Clerk & Admin) ────────────────────────────── */
+PANES.room_mgmt = async mc => {
+  mc.innerHTML=`<h2>🏢 Room Management</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="rmTab(this,'rm-rooms')">Rooms</button>
+    <button class="tab-btn" onclick="rmTab(this,'rm-schedules')">Schedules</button>
+  </div>
+  <div id="rm-rooms"></div>
+  <div id="rm-schedules"  style="display:none"></div>`;
+  loadRooms();
+};
+function rmTab(btn,pane){
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['rm-rooms','rm-schedules'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if(pane==='rm-rooms'      && !$id('rm-rooms').innerHTML)      loadRooms();
+  if(pane==='rm-schedules') loadSchedules();
+}
+
+/* ── Course Management (Head Clerk & Admin) ────────────────────────── */
+PANES.course_mgmt = async mc => {
+  mc.innerHTML=`<h2>📚 Course Management</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="cmTab(this,'cm-course-req')">Course Requests</button>
+    <button class="tab-btn" onclick="cmTab(this,'cm-sections')">Sections</button>
+  </div>
+  <div id="cm-course-req"></div>
+  <div id="cm-sections" style="display:none"></div>`;
+  loadCMCourseRequests();
+};
+function cmTab(btn,pane){
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['cm-course-req','cm-sections'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if(pane==='cm-course-req') loadCMCourseRequests();
+  if(pane==='cm-sections')   loadCMSections();
+}
+async function loadCMCourseRequests(){
+  const el=$id('cm-course-req');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/course-requests');
+  const d=await r.json();
+  const reqs=d.requests||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Course Requests (${reqs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openCourseReqModal2()">➕ Register Course</button>
+    </div>
+    ${reqs.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Code</th><th>Name</th><th>Section</th><th>Semester</th><th>Teacher</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>${reqs.map(q=>`<tr>
+        <td>${q.code}</td><td>${q.name}</td>
+        <td>${q.section||'—'}</td><td>${q.semester||'—'}</td>
+        <td>${q.teacher_name||'—'}</td>
+        <td><span class="badge badge-${q.status==='approved'?'success':q.status==='rejected'?'danger':'warn'}">${q.status}</span></td>
+        <td>${new Date(q.created_at).toLocaleDateString()}</td>
+      </tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No requests yet.</p>`}
+  </div>`;
+}
+async function loadCMSections(){
+  const el=$id('cm-sections');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/sections');
+  const d=await r.json();
+  const secs=d.sections||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Sections (${secs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddSectionModal()">➕ Add Section</button>
+    </div>
+    ${secs.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Name</th><th>Program</th><th>Semester</th><th>Coordinator</th><th>Students</th><th>Actions</th></tr></thead>
+      <tbody>${secs.map(s=>`<tr>
+        <td>${s.name}</td><td>${s.program}</td>
+        <td>${s.semester||'—'}</td><td>${s.coordinator_name||'—'}</td>
+        <td><button class="btn btn-sm btn-ghost" onclick="openManageSectionStudents(${s.section_id},'${escHtml(s.name)}')">${s.student_count}</button></td>
+        <td>
+          <button class="btn btn-sm btn-ghost" onclick="openEditSectionModal(${s.section_id},'${escHtml(s.name)}','${s.program}','${escHtml(s.semester||'')}',${s.coordinator_id||'null'})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteSection(${s.section_id})">Del</button>
+        </td>
+      </tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No sections yet.</p>`}
+  </div>`;
+}
+async function openCourseReqModal2(){
+  const [teachersR, sectionsR] = await Promise.all([
+    apiFetch('/clerk/teachers').then(r=>r.json()),
+    apiFetch('/clerk/sections').then(r=>r.json()).catch(()=>({sections:[]})),
+  ]);
+  const teachers=teachersR.teachers||[];
+  const sections=sectionsR.sections||[];
+  openModal('Register Course (Request Admin Approval)',`
+    <div class="form-field"><label>Course Code *</label><input id="cr2-code" placeholder="e.g. CS-401"/></div>
+    <div class="form-field"><label>Course Name *</label><input id="cr2-name" placeholder="e.g. Algorithms"/></div>
+    <div class="form-field"><label>Assign Teacher *</label>
+      <select id="cr2-teacher"><option value="">— Select Teacher —</option>${teachers.length?teachers.map(t=>`<option value="${t.user_id}">${t.name}${t.department?' ('+t.department+')':''}</option>`).join(''):'<option disabled>No teachers found</option>'}</select>
+    </div>
+    <div class="form-field"><label>Section (from list)</label>
+      <select id="cr2-section-id">
+        <option value="">— No section —</option>
+        ${sections.map(s=>`<option value="${s.section_id}">${s.name} (${s.program})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-field"><label>Section Name (manual override)</label><input id="cr2-section" placeholder="A"/></div>
+    <div class="form-field"><label>Semester</label><input id="cr2-semester" placeholder="Spring 2025"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="submitCourseReq2()">Submit Request</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function submitCourseReq2(){
+  const secId=$id('cr2-section-id').value;
+  const payload={
+    code:$id('cr2-code').value.trim(),
+    name:$id('cr2-name').value.trim(),
+    teacher_id:parseInt($id('cr2-teacher').value),
+    section:$id('cr2-section').value.trim()||undefined,
+    section_id:secId?parseInt(secId):undefined,
+    semester:$id('cr2-semester').value.trim()||undefined,
+  };
+  if(!payload.code||!payload.name||!payload.teacher_id){alert('Code, Name and Teacher are required.');return;}
+  const r=await apiFetch('/clerk/course-requests',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadCMCourseRequests();
+}
+async function loadRooms(){
+  const el=$id('rm-rooms');
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/clerk/locations');
+  const d=await r.json();
+  const locs=d.locations||[];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Rooms (${locs.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddRoomModal()">➕ Add Room</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Wing</th><th>Floor</th><th>Available</th><th>Actions</th></tr></thead>
+      <tbody>${locs.map(l=>`<tr>
+        <td>${l.location_id}</td><td>${l.name}</td>
+        <td>${l.category||'—'}</td><td>${l.wing_name||'—'}</td><td>${l.floor_level??'—'}</td>
+        <td>
+          <label class="toggle-lbl" style="cursor:pointer;display:flex;align-items:center;gap:.3rem">
+            <input type="checkbox" ${l.is_active?'checked':''} onchange="toggleRoom(${l.location_id},this.checked)" style="cursor:pointer"/>
+            <span class="avail-dot ${l.is_active?'on':'off'}"></span>
+            ${l.is_active?'Available':'Unavailable'}
+          </label>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-ghost" onclick="openEditRoomModal(${l.location_id},'${escHtml(l.name)}','${escHtml(l.category||'')}','${escHtml(l.wing_name||'')}',${l.floor_level??'null'})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRoom(${l.location_id})">Del</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+function openAddRoomModal(){
+  openModal('Add Room',`
+    <div class="form-field"><label>Room Name *</label><input id="ar-name" placeholder="e.g. Lab 5"/></div>
+    <div class="form-field"><label>Category</label>
+      <select id="ar-cat"><option value="">—</option><option>Lab</option><option>Classroom</option><option>Office</option><option>Corridor</option><option>Cafe</option></select>
+    </div>
+    <div class="form-field"><label>Wing</label>
+      <select id="ar-wing"><option value="">—</option><option>Old Campus</option><option>New Campus</option></select>
+    </div>
+    <div class="form-field"><label>Floor Level</label><input id="ar-floor" type="number" placeholder="0 = ground"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addRoom()">Add</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function addRoom(){
+  const name=$id('ar-name').value.trim();
+  if(!name){alert('Room name required.');return;}
+  const payload={
+    name, category:$id('ar-cat').value||null,
+    wing_name:$id('ar-wing').value||null,
+    floor_level:$id('ar-floor').value?parseInt($id('ar-floor').value):null,
+  };
+  const r=await apiFetch('/clerk/locations',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadRooms();
+}
+function openEditRoomModal(id,name,cat,wing,floor){
+  openModal('Edit Room',`
+    <div class="form-field"><label>Room Name</label><input id="er-name" value="${escHtml(name)}"/></div>
+    <div class="form-field"><label>Category</label>
+      <select id="er-cat">
+        <option value="" ${!cat?'selected':''}>—</option>
+        ${['Lab','Classroom','Office','Corridor','Cafe'].map(c=>`<option ${cat===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-field"><label>Wing</label>
+      <select id="er-wing">
+        <option value="" ${!wing?'selected':''}>—</option>
+        ${['Old Campus','New Campus'].map(w=>`<option ${wing===w?'selected':''}>${w}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-field"><label>Floor Level</label><input id="er-floor" type="number" value="${floor??''}"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="saveRoom(${id})">Save</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function saveRoom(id){
+  const payload={
+    name:$id('er-name').value.trim()||undefined,
+    category:$id('er-cat').value||undefined,
+    wing_name:$id('er-wing').value||undefined,
+    floor_level:$id('er-floor').value!==''?parseInt($id('er-floor').value):undefined,
+  };
+  const r=await apiFetch(`/clerk/locations/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadRooms();
+}
+async function deleteRoom(id){
+  if(!confirm('Delete this room? Associated schedules will also be deleted.'))return;
+  const r=await apiFetch(`/clerk/locations/${id}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadRooms();
+}
+async function toggleRoom(id,active){
+  await apiFetch(`/clerk/locations/${id}`,{method:'PUT',body:JSON.stringify({is_active:active})});
+  loadRooms();
+}
+
+let _rooms_cache=[];  // for schedule room dropdown
+
+async function loadSchedules(){
+  const el=$id('rm-schedules');
+  el.innerHTML='<span class="spinner"></span>';
+  const [schedR,locsR]=await Promise.all([
+    apiFetch('/clerk/schedules').then(r=>r.json()),
+    apiFetch('/clerk/locations').then(r=>r.json()),
+  ]);
+  _rooms_cache=locsR.locations||[];
+  const scheds=schedR.schedules||[];
+  const DAYS=['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  el.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="card-title" style="margin:0">Schedules (${scheds.length})</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddScheduleModal()">➕ Add Schedule</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Day</th><th>Room</th><th>Course</th><th>Section</th><th>Start</th><th>End</th><th>Notes</th><th>Actions</th></tr></thead>
+      <tbody>${scheds.map(s=>`<tr>
+        <td>${DAYS[s.day_of_week]||s.day_of_week}</td>
+        <td>${s.location_name||s.location_id}</td>
+        <td>${s.course_code}</td><td>${s.section||'—'}</td>
+        <td>${s.start_time||'—'}</td><td>${s.end_time||'—'}</td>
+        <td>${s.notes||'—'}</td>
+        <td>
+          <button class="btn btn-sm btn-ghost" onclick="openEditScheduleModal(${s.schedule_id},${s.location_id},'${s.course_code}',${s.day_of_week},'${s.start_time||''}','${s.end_time||''}','${escHtml(s.section||'')}','${escHtml(s.notes||'')}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${s.schedule_id})">Del</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+const DAYS_LIST=[{v:1,l:'Monday'},{v:2,l:'Tuesday'},{v:3,l:'Wednesday'},{v:4,l:'Thursday'},{v:5,l:'Friday'},{v:6,l:'Saturday'},{v:7,l:'Sunday'}];
+function roomDropdown(selId){ return `<select id="${selId}">${_rooms_cache.map(r=>`<option value="${r.location_id}">${r.name}</option>`).join('')}</select>`; }
+function dayDropdown(selId,sel){ return `<select id="${selId}">${DAYS_LIST.map(d=>`<option value="${d.v}" ${d.v===sel?'selected':''}>${d.l}</option>`).join('')}</select>`; }
+
+function openAddScheduleModal(){
+  openModal('Add Schedule',`
+    <div class="form-field"><label>Room *</label>${roomDropdown('ns-room')}</div>
+    <div class="form-field"><label>Course Code *</label><input id="ns-code" placeholder="e.g. CS-301"/></div>
+    <div class="form-field"><label>Section</label><input id="ns-sec" placeholder="A"/></div>
+    <div class="form-field"><label>Day *</label>${dayDropdown('ns-day',1)}</div>
+    <div class="form-field"><label>Start Time *</label><input id="ns-start" type="time" value="08:00"/></div>
+    <div class="form-field"><label>End Time *</label><input id="ns-end" type="time" value="10:00"/></div>
+    <div class="form-field"><label>Notes</label><input id="ns-notes"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addSchedule()">Add</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function addSchedule(){
+  const payload={
+    location_id:parseInt($id('ns-room').value),
+    course_code:$id('ns-code').value.trim(),
+    day_of_week:parseInt($id('ns-day').value),
+    start_time:$id('ns-start').value,
+    end_time:$id('ns-end').value,
+    section:$id('ns-sec').value.trim()||null,
+    notes:$id('ns-notes').value.trim()||null,
+  };
+  if(!payload.course_code||!payload.start_time||!payload.end_time){alert('Fill required fields.');return;}
+  const r=await apiFetch('/clerk/schedules',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadSchedules();
+}
+function openEditScheduleModal(id,locId,code,day,start,end,sec,notes){
+  openModal('Edit Schedule',`
+    <div class="form-field"><label>Room</label>${roomDropdown('es-room')}</div>
+    <div class="form-field"><label>Course Code</label><input id="es-code" value="${escHtml(code)}"/></div>
+    <div class="form-field"><label>Section</label><input id="es-sec" value="${escHtml(sec)}"/></div>
+    <div class="form-field"><label>Day</label>${dayDropdown('es-day',day)}</div>
+    <div class="form-field"><label>Start Time</label><input id="es-start" type="time" value="${(start||'').substring(0,5)}"/></div>
+    <div class="form-field"><label>End Time</label><input id="es-end" type="time" value="${(end||'').substring(0,5)}"/></div>
+    <div class="form-field"><label>Notes</label><input id="es-notes" value="${escHtml(notes)}"/></div>`,
+    `<button class="btn btn-primary btn-sm" onclick="saveSchedule(${id})">Save</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+  // Pre-select current room
+  setTimeout(()=>{ const s=$id('es-room'); if(s){[...s.options].forEach(o=>{if(parseInt(o.value)===locId)o.selected=true;});} },50);
+}
+async function saveSchedule(id){
+  const payload={
+    location_id:parseInt($id('es-room').value),
+    course_code:$id('es-code').value.trim()||undefined,
+    day_of_week:parseInt($id('es-day').value),
+    start_time:$id('es-start').value||undefined,
+    end_time:$id('es-end').value||undefined,
+    section:$id('es-sec').value.trim()||undefined,
+    notes:$id('es-notes').value.trim()||undefined,
+  };
+  const r=await apiFetch(`/clerk/schedules/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal(); loadSchedules();
+}
+async function deleteSchedule(id){
+  if(!confirm('Delete this schedule?'))return;
+  const r=await apiFetch(`/clerk/schedules/${id}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadSchedules();
+}
+
+/* ── Clerk: Course Requests ──────────────────────────────────────────── */
+async function loadClerkCourseRequests(){
+  // Redirect to new course management pane function
+  if($id('cm-course-req')) { loadCMCourseRequests(); return; }
+}
+
+/* ── Section Management (Head Clerk) ─────────────────────────────────── */
+async function loadSections() {
+  // Try to refresh cm-sections (course_mgmt pane) if it exists
+  const el=$id('cm-sections');
+  if(el) { loadCMSections(); return; }
+}
+async function openAddSectionModal(){
+  const dcsR=await apiFetch('/clerk/degree-coordinators').then(r=>r.json());
+  const dcs=dcsR.coordinators||[];
+  openModal('Add Section',`
+    <div class="form-field"><label>Section Name *</label><input id="sec-name" placeholder="e.g. CS-6A"/></div>
+    <div class="form-field"><label>Program *</label>
+      <select id="sec-prog"><option value="CS">CS</option><option value="SE">SE</option><option value="IT">IT</option><option value="DS">DS</option><option value="AI">AI</option></select>
+    </div>
+    <div class="form-field"><label>Semester</label><input id="sec-sem" placeholder="Spring 2025"/></div>
+    <div class="form-field"><label>Degree Coordinator</label>
+      <select id="sec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}">${u.name}${u.department?' ('+u.department+')':''}</option>`).join('')}${!dcs.length?'<option disabled>No degree coordinators — add one first</option>':''}</select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addSection()">Add</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function addSection(){
+  const payload={
+    name:$id('sec-name').value.trim(),
+    program:$id('sec-prog').value,
+    semester:$id('sec-sem').value.trim()||undefined,
+    coordinator_id:$id('sec-coord').value?parseInt($id('sec-coord').value):undefined,
+  };
+  if(!payload.name){alert('Section name required.');return;}
+  const r=await apiFetch('/clerk/sections',{method:'POST',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal();
+  if($id('cm-sections')) loadCMSections();
+}
+async function openEditSectionModal(id,name,prog,sem,coordId){
+  const dcsR=await apiFetch('/clerk/degree-coordinators').then(r=>r.json());
+  const dcs=dcsR.coordinators||[];
+  openModal('Edit Section',`
+    <div class="form-field"><label>Section Name</label><input id="esec-name" value="${escHtml(name)}"/></div>
+    <div class="form-field"><label>Program</label>
+      <select id="esec-prog"><option value="CS" ${prog==='CS'?'selected':''}>CS</option><option value="SE" ${prog==='SE'?'selected':''}>SE</option><option value="IT" ${prog==='IT'?'selected':''}>IT</option><option value="DS" ${prog==='DS'?'selected':''}>DS</option><option value="AI" ${prog==='AI'?'selected':''}>AI</option></select>
+    </div>
+    <div class="form-field"><label>Semester</label><input id="esec-sem" value="${escHtml(sem)}"/></div>
+    <div class="form-field"><label>Degree Coordinator</label>
+      <select id="esec-coord"><option value="">— None —</option>${dcs.map(u=>`<option value="${u.user_id}" ${u.user_id==coordId?'selected':''}>${u.name}${u.department?' ('+u.department+')':''}</option>`).join('')}</select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="saveSection(${id})">Save</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>`
+  );
+}
+async function saveSection(id){
+  const payload={
+    name:$id('esec-name').value.trim()||undefined,
+    program:$id('esec-prog').value,
+    semester:$id('esec-sem').value.trim()||undefined,
+    coordinator_id:$id('esec-coord').value?parseInt($id('esec-coord').value):undefined,
+  };
+  const r=await apiFetch(`/clerk/sections/${id}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal();
+  if($id('cm-sections')) loadCMSections();
+}
+async function deleteSection(id){
+  if(!confirm('Delete this section and all student memberships?'))return;
+  const r=await apiFetch(`/clerk/sections/${id}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  if($id('cm-sections')) loadCMSections();
+}
+async function openManageSectionStudents(sectionId, sectionName){
+  const [secStudR, allStudR] = await Promise.all([
+    apiFetch(`/clerk/sections/${sectionId}/students`).then(r=>r.json()),
+    apiFetch('/clerk/students').then(r=>r.json()),
+  ]);
+  const students=secStudR.students||[];
+  const allStudents=allStudR.students||[];
+  const enrolledIds=new Set(students.map(s=>s.student_id));
+  openModal(`Students in ${sectionName}`,`
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">Enrolled: ${students.length}</p>
+    ${students.length?`<div class="tbl-wrap" style="max-height:200px;overflow-y:auto"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Dept</th><th>Action</th></tr></thead>
+      <tbody>${students.map(s=>`<tr><td>${s.name}</td><td>${s.email}</td><td>${s.department||'—'}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="removeFromSection(${sectionId},${s.student_id})">Remove</button></td>
+      </tr>`).join('')}</tbody></table></div>`:''
+    }
+    <hr style="margin:.8rem 0"/>
+    <div class="form-field"><label>Add Student</label>
+      <select id="sec-add-stud">
+        <option value="">— Select student —</option>
+        ${allStudents.filter(u=>!enrolledIds.has(u.user_id)).map(u=>`<option value="${u.user_id}">${u.name}${u.department?' ('+u.department+')':''} – ${u.email}</option>`).join('')}
+      </select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="addToSection(${sectionId})">Add Student</button>
+     <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>`
+  );
+}
+async function addToSection(sectionId){
+  const sid=parseInt($id('sec-add-stud').value);
+  if(!sid){alert('Select a student.');return;}
+  const r=await apiFetch(`/clerk/sections/${sectionId}/students`,{method:'POST',body:JSON.stringify({student_id:sid})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  closeModal();
+  const locR=await apiFetch('/clerk/sections').then(r=>r.json());
+  const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
+  if(s) openManageSectionStudents(sectionId,s.name);
+  if($id('cm-sections')) loadCMSections();
+}
+async function removeFromSection(sectionId,studentId){
+  if(!confirm('Remove student from section?'))return;
+  const r=await apiFetch(`/clerk/sections/${sectionId}/students/${studentId}`,{method:'DELETE'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  const locR=await apiFetch('/clerk/sections').then(r=>r.json());
+  const s=(locR.sections||[]).find(s=>s.section_id===sectionId);
+  closeModal();
+  if(s) openManageSectionStudents(sectionId,s.name);
+  if($id('cm-sections')) loadCMSections();
+}
+
+/* ── Degree Coordinator Panel ────────────────────────────────────────── */
+PANES.dc_panel = async mc => {
+  mc.innerHTML=`<h2>🎯 My Section</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="dcTab(this,'dc-overview')">Overview</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-students')">Students</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-schedule')">Schedule</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-teachers')">Teachers</button>
+    <button class="tab-btn" onclick="dcTab(this,'dc-enroll')">Enrollment Requests</button>
+  </div>
+  <div id="dc-overview"></div>
+  <div id="dc-students"  style="display:none"></div>
+  <div id="dc-schedule"  style="display:none"></div>
+  <div id="dc-teachers"  style="display:none"></div>
+  <div id="dc-enroll"    style="display:none"></div>`;
+  loadDCOverview();
+};
+function dcTab(btn,pane){
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['dc-overview','dc-students','dc-schedule','dc-teachers','dc-enroll'].forEach(id=>{const el=$id(id);if(el)el.style.display='none';});
+  $id(pane).style.display='';
+  if(pane==='dc-overview') loadDCOverview();
+  if(pane==='dc-students') loadDCStudents();
+  if(pane==='dc-schedule') loadDCSchedule();
+  if(pane==='dc-teachers') loadDCTeachers();
+  if(pane==='dc-enroll')   loadDCEnrollRequests();
+}
+async function loadDCOverview(){
+  $id('dc-overview').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/my-section');
+  const d=await r.json();
+  $id('dc-overview').innerHTML=`<div class="card">
+    <div class="card-title">📋 Section Details</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="val">${d.name||'—'}</div><div class="lbl">Section Name</div></div>
+      <div class="stat-card"><div class="val">${d.program||'—'}</div><div class="lbl">Program</div></div>
+      <div class="stat-card"><div class="val">${d.semester||'—'}</div><div class="lbl">Semester</div></div>
+      <div class="stat-card"><div class="val">${d.student_count||0}</div><div class="lbl">Students</div></div>
+    </div>
+  </div>`;
+}
+async function loadDCStudents(){
+  $id('dc-students').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/students');
+  const d=await r.json();
+  const students=d.students||[];
+  $id('dc-students').innerHTML=`<div class="card"><div class="card-title">Students (${students.length})</div>
+  ${students.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Name</th><th>Email</th><th>Enrolled</th><th>Actions</th></tr></thead>
+    <tbody>${students.map(s=>`<tr>
+      <td>${s.name}</td><td>${s.email}</td>
+      <td>${new Date(s.enrolled_at).toLocaleDateString()}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="viewStudentReport(${s.student_id},'${escHtml(s.name)}')">Progress Report</button></td>
+    </tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No students in section.</p>'}</div>`;
+}
+async function viewStudentReport(studentId, studentName){
+  const r=await apiFetch(`/dc/students/${studentId}/report`);
+  if(!r||!r.ok){alert('Could not load report.');return;}
+  const d=await r.json();
+  const courses=d.courses||[];
+  let html=`<h3>${studentName}</h3><p style="color:var(--muted);font-size:.82rem">${d.email}</p>`;
+  if(!courses.length){html+='<p>No courses enrolled.</p>';}
+  courses.forEach(c=>{
+    html+=`<div style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.6rem">
+      <b>${c.code} – ${c.name}</b> <span style="color:var(--muted);font-size:.8rem">Section: ${c.section||'—'} | Teacher: ${c.teacher_name}</span>
+      <table style="width:100%;font-size:.82rem;margin-top:.4rem"><thead><tr>`;
+    ['Attendance','Quiz','Activity','Mid','Final'].forEach(cat=>html+=`<th style="background:var(--g);color:white;padding:.3rem .5rem">${cat}</th>`);
+    html+=`</tr></thead><tbody><tr>`;
+    ['attendance','quiz','activity','mid','final'].forEach(cat=>{
+      const marks=c.marks[cat]||[];
+      html+=`<td style="padding:.3rem .5rem;vertical-align:top">${marks.length?marks.map(m=>`${m.title}: ${m.marks_obtained??'–'}/${m.total_marks??'–'}`).join('<br>'):'—'}</td>`;
+    });
+    html+=`</tr></tbody></table></div>`;
+  });
+  openModal(`Progress Report – ${studentName}`, html);
+}
+async function loadDCSchedule(){
+  $id('dc-schedule').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/schedule');
+  const d=await r.json();
+  const sched=d.schedule||[];
+  $id('dc-schedule').innerHTML=`<div class="card"><div class="card-title">📅 Class Schedule</div>
+  ${sched.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Day</th><th>Course</th><th>Room</th><th>Start</th><th>End</th><th>Notes</th></tr></thead>
+    <tbody>${sched.map(s=>`<tr>
+      <td>${s.day}</td><td>${s.course_code}</td><td>${s.location_name}</td>
+      <td>${s.start_time||'—'}</td><td>${s.end_time||'—'}</td><td>${s.notes||'—'}</td>
+    </tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No schedule found for this section.</p>'}</div>`;
+}
+async function loadDCTeachers(){
+  $id('dc-teachers').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/teachers');
+  const d=await r.json();
+  const teachers=d.teachers||[];
+  $id('dc-teachers').innerHTML=`<div class="card"><div class="card-title">👩‍🏫 Teachers (${teachers.length})</div>
+  ${teachers.length?teachers.map(t=>`
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:.8rem;margin-bottom:.6rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
+        <div>
+          <b>${t.name}</b> <span style="color:var(--muted);font-size:.82rem">${t.email}</span>
+          ${t.department?`<span class="badge badge-blue" style="margin-left:.4rem">${t.department}</span>`:''}
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="viewTeacherStudents(${t.teacher_id},'${escHtml(t.name)}')">👥 View Students</button>
+      </div>
+      <div style="margin-top:.4rem">${t.courses.map(c=>`<span class="course-pill">${c.code} – ${c.name}</span>`).join('')}</div>
+    </div>`).join('')
+  :'<p style="color:var(--muted)">No teachers found for this section.</p>'}</div>`;
+}
+
+async function viewTeacherStudents(teacherId, teacherName) {
+  openModal(`👥 Students taught by ${teacherName}`,`<div style="text-align:center"><span class="spinner"></span></div>`);
+  const r = await apiFetch(`/dc/teachers/${teacherId}/students`);
+  if(!r||!r.ok){ $id('modal-body').innerHTML='<div class="alert alert-danger">Could not load data.</div>'; return; }
+  const d = await r.json();
+  const courses = d.courses||[];
+  if(!courses.length){ $id('modal-body').innerHTML='<div class="alert alert-info">No students enrolled in this teacher\'s courses.</div>'; return; }
+  let html='';
+  courses.forEach(c=>{
+    const students=c.students||[];
+    html+=`<div style="margin-bottom:.8rem">
+      <b>${c.code} – ${c.name}</b>
+      <span style="font-size:.8rem;color:var(--muted)"> · Section: ${c.section||'—'} · Semester: ${c.semester||'—'}</span>
+      ${students.length?`<div class="tbl-wrap" style="margin-top:.4rem"><table>
+        <thead><tr><th>Name</th><th>Email</th><th>Dept</th></tr></thead>
+        <tbody>${students.map(s=>`<tr>
+          <td>${s.name}</td><td>${s.email}</td>
+          <td>${s.department?`<span class="badge badge-${s.department===d.teacher_department?'green':'orange'}">${s.department}</span>`:'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`:'<p style="color:var(--muted);font-size:.83rem">No students enrolled.</p>'}
+    </div>`;
+  });
+  $id('modal-body').innerHTML=html;
+}
+async function loadDCEnrollRequests(){
+  $id('dc-enroll').innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/dc/enrollment-requests');
+  const d=await r.json();
+  const reqs=(d.requests||[]).filter(q=>q.status==='pending');
+  $id('dc-enroll').innerHTML=`<div class="card"><div class="card-title">Enrollment Requests (${reqs.length})</div>
+  ${reqs.length?`
+  <div style="margin-bottom:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn btn-sm btn-primary" onclick="bulkSelectAll('dc-er-chk')">Select All</button>
+    <button class="btn btn-sm btn-ghost" onclick="bulkDeselectAll('dc-er-chk')">Deselect</button>
+    <button class="btn btn-sm btn-primary" onclick="dcBulkApprove()">✓ Bulk Approve</button>
+    <button class="btn btn-sm btn-danger"  onclick="dcBulkReject()">✗ Bulk Reject</button>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" onchange="toggleAll('dc-er-chk',this)"/></th><th>Student</th><th>Course</th><th>Teacher</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td><input type="checkbox" class="dc-er-chk" value="${q.request_id}"/></td>
+      <td>${q.student_name}</td><td>${q.course_code} — ${q.course_name}</td>
+      <td>${q.teacher_name}</td><td>${new Date(q.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="dcApproveEnroll(${q.request_id})">✓</button>
+        <button class="btn btn-sm btn-danger"  onclick="dcRejectEnroll(${q.request_id})">✗</button>
+      </td></tr>`).join('')}</tbody></table></div>`
+  :'<p style="color:var(--muted)">No pending enrollment requests.</p>'}</div>`;
+}
+async function dcApproveEnroll(id){
+  const r=await apiFetch(`/dc/enrollment-requests/${id}/approve`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcRejectEnroll(id){
+  if(!confirm('Reject this enrollment request?'))return;
+  const r=await apiFetch(`/dc/enrollment-requests/${id}/reject`,{method:'POST'});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcBulkApprove(){
+  const ids=getChecked('dc-er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  const r=await apiFetch('/dc/enrollment-requests/bulk-approve',{method:'POST',body:JSON.stringify({request_ids:ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+async function dcBulkReject(){
+  const ids=getChecked('dc-er-chk'); if(!ids.length){alert('Select at least one.');return;}
+  if(!confirm(`Reject ${ids.length} enrollment requests?`))return;
+  const r=await apiFetch('/dc/enrollment-requests/bulk-reject',{method:'POST',body:JSON.stringify({request_ids:ids})});
+  if(!r.ok){alert((await r.json()).detail);return;}
+  loadDCEnrollRequests();
+}
+
+/* ── Student: Enrollment Requests ────────────────────────────────────── */
+async function loadEnrollmentRequests(){
+  const el=$id('enroll-req-body');
+  if(!el) return;
+  el.innerHTML='<span class="spinner"></span>';
+  const r=await apiFetch('/enrollment-requests/my');
+  const d=await r.json();
+  const reqs=d.requests||[];
+  el.innerHTML=reqs.length?`<div class="tbl-wrap"><table>
+    <thead><tr><th>Course</th><th>Teacher</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>${reqs.map(q=>`<tr>
+      <td>${q.course_code} — ${q.course_name}</td><td>${q.teacher_name}</td>
+      <td>${badge(q.status, q.status==='approved'?'badge-green':q.status==='rejected'?'badge-red':'badge-blue')}</td>
+      <td>${new Date(q.created_at).toLocaleDateString()}</td>
+    </tr>`).join('')}</tbody></table></div>`
+    :`<p style="color:var(--muted)">No enrollment requests yet.</p>`;
+}
+async function openEnrollReqModal(){
+  // Use /courses/available to show all active courses (any department)
+  const allR=await apiFetch('/courses/available').then(r=>r&&r.ok?r.json():{courses:[]}).catch(()=>({courses:[]}));
+  const courses=(allR.courses||[]).filter(c=>!c.already_enrolled);
+  if(!courses.length){showToastInfo('No new courses available for enrollment (you may already be enrolled in all active courses).');return;}
+  openModal('Request Enrollment',`
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">You can enroll in courses from any department. Your degree coordinator will manage your record.</p>
+    <div class="form-field"><label>Select Course *</label>
+      <select id="er-course">${courses.map(c=>`<option value="${c.course_id}">${c.code} — ${c.name} (${c.teacher_name||''}${c.teacher_department?' · '+c.teacher_department:''})</option>`).join('')}</select>
+    </div>`,
+    `<button class="btn btn-primary btn-sm" onclick="submitEnrollReq()">Submit Request</button>
+     <button class="btn btn-ghost btn-sm"   onclick="closeModal()">Cancel</button>`
+  );
+}
+async function submitEnrollReq(){
+  const courseId=parseInt($id('er-course').value);
+  const r=await apiFetch('/enrollment-requests',{method:'POST',body:JSON.stringify({course_id:courseId})});
+  if(!r.ok){showToastError((await r.json()).detail||'Enrollment request failed.');return;}
+  closeModal();
+  showToastSuccess('✓ Enrollment request submitted! Awaiting approval.');
+  loadEnrollmentRequests();
+}
+
+/* ═══════════════════════════════ INIT ══════════════════════════════ */
+(function init(){
+  if(_token && _user){
+    bootApp();
+  } else {
+    $id('screen-login').style.display='flex';
+  }
+})();
+</script>
+</body>
+</html>

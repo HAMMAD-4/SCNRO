@@ -171,3 +171,130 @@ class NavigationPath {
             .toList(),
       );
 }
+
+// ── Attendance models ────────────────────────────────────────────────────────
+
+class DailyAttendanceRecord {
+  final int recordId;
+  final int studentId;
+  final int courseId;
+  final String date;
+  /// "present" | "absent" | "late"
+  final String status;
+  final int markedBy;
+  final String? createdAt;
+
+  const DailyAttendanceRecord({
+    required this.recordId,
+    required this.studentId,
+    required this.courseId,
+    required this.date,
+    required this.status,
+    required this.markedBy,
+    this.createdAt,
+  });
+
+  factory DailyAttendanceRecord.fromJson(Map<String, dynamic> json) =>
+      DailyAttendanceRecord(
+        recordId: json['record_id'] as int,
+        studentId: json['student_id'] as int,
+        courseId: json['course_id'] as int,
+        date: json['date'] as String,
+        status: json['status'] as String,
+        markedBy: json['marked_by'] as int,
+        createdAt: json['created_at'] as String?,
+      );
+}
+
+class AttendanceFineRecord {
+  final int fineId;
+  final int studentId;
+  final String studentName;
+  final String studentEmail;
+  final int courseId;
+  final String courseCode;
+  final String courseName;
+  final double? attendancePercentage;
+  final double fineAmount;
+  final String? reason;
+  /// "pending" | "paid" | "waived"
+  final String status;
+  final String issuedAt;
+
+  const AttendanceFineRecord({
+    required this.fineId,
+    required this.studentId,
+    required this.studentName,
+    required this.studentEmail,
+    required this.courseId,
+    required this.courseCode,
+    required this.courseName,
+    this.attendancePercentage,
+    required this.fineAmount,
+    this.reason,
+    required this.status,
+    required this.issuedAt,
+  });
+
+  factory AttendanceFineRecord.fromJson(Map<String, dynamic> json) =>
+      AttendanceFineRecord(
+        fineId: json['fine_id'] as int,
+        studentId: json['student_id'] as int,
+        studentName: json['student_name'] as String? ?? '',
+        studentEmail: json['student_email'] as String? ?? '',
+        courseId: json['course_id'] as int,
+        courseCode: json['course_code'] as String? ?? '',
+        courseName: json['course_name'] as String? ?? '',
+        attendancePercentage:
+            (json['attendance_percentage'] as num?)?.toDouble(),
+        fineAmount: (json['fine_amount'] as num).toDouble(),
+        reason: json['reason'] as String?,
+        status: json['status'] as String,
+        issuedAt: json['issued_at'] as String,
+      );
+}
+
+class AttendanceStudentSummary {
+  final int studentId;
+  final String name;
+  final String email;
+  final int totalClasses;
+  final int present;
+  final int absent;
+  final int late;
+  final double percentage;
+  /// true when attendance < 75 %
+  final bool fineRequired;
+  /// false when attendance < 70 %
+  final bool examEligible;
+  final Map<String, dynamic>? fine;
+
+  const AttendanceStudentSummary({
+    required this.studentId,
+    required this.name,
+    required this.email,
+    required this.totalClasses,
+    required this.present,
+    required this.absent,
+    required this.late,
+    required this.percentage,
+    required this.fineRequired,
+    required this.examEligible,
+    this.fine,
+  });
+
+  factory AttendanceStudentSummary.fromJson(Map<String, dynamic> json) =>
+      AttendanceStudentSummary(
+        studentId: json['student_id'] as int,
+        name: json['name'] as String? ?? '',
+        email: json['email'] as String? ?? '',
+        totalClasses: (json['total_classes'] as num?)?.toInt() ?? 0,
+        present: (json['present'] as num?)?.toInt() ?? 0,
+        absent: (json['absent'] as num?)?.toInt() ?? 0,
+        late: (json['late'] as num?)?.toInt() ?? 0,
+        percentage: (json['percentage'] as num?)?.toDouble() ?? 0.0,
+        fineRequired: json['fine_required'] as bool? ?? false,
+        examEligible: json['exam_eligible'] as bool? ?? true,
+        fine: json['fine'] as Map<String, dynamic>?,
+      );
+}

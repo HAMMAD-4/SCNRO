@@ -7,11 +7,12 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from app.auth_utils import get_current_user
 from app.database import get_db
-from app.models import Location, Schedule
+from app.models import Location, Schedule, User
 from app.services.optimizer import rank_vacant_rooms
 
 router = APIRouter(prefix="/api/v1", tags=["Resources"])
@@ -128,3 +129,100 @@ def get_available_resources(
 
     _cache_set(cache_key, ranked)
     return {"available_rooms": ranked, "cached": False}
+
+
+@router.get("/resources/free-rooms")
+def get_free_rooms(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Return rooms that are completely unscheduled (no schedule entries at all)
+    AND rooms that are not currently occupied right now.
+
+    The response contains two groups:
+    - ``never_scheduled``: rooms with zero schedule entries ever
+    - ``currently_free``: rooms that have schedules but are free right now
+    """
+    now = datetime.now()
+    current_day = now.isoweekday()  # 1 = Mon … 7 = Sun
+    current_time = now.time()
+
+    # All location_ids that have at least one schedule entry ever
+    scheduled_ids_subq = (
+        db.query(Schedule.location_id)
+        .filter(Schedule.location_id.isnot(None))
+        .distinct()
+        .scalar_subquery()
+    )
+
+    # 1. Rooms with NO schedule at all
+    never_scheduled = (
+        db.query(Location)
+        .filter(
+            Location.is_active.is_(True),
+            ~Location.location_id.in_(scheduled_ids_subq),
+        )
+        .order_by(Location.name)
+        .all()
+    )
+
+    # 2. Rooms that have schedules but are NOT currently occupied
+    currently_occupied_subq = (
+        db.query(Schedule.location_id)
+        .filter(
+            Schedule.day_of_week == current_day,
+            Schedule.start_time <= current_time,
+            Schedule.end_time > current_time,
+            Schedule.location_id.isnot(None),
+        )
+        .distinct()
+        .scalar_subquery()
+    )
+
+    currently_free = (
+        db.query(Location)
+        .filter(
+            Location.is_active.is_(True),
+            Location.location_id.in_(scheduled_ids_subq),  # has schedules
+            ~Location.location_id.in_(currently_occupied_subq),  # not now busy
+        )
+        .order_by(Location.name)
+        .all()
+    )
+
+    def _fmt(loc: Location) -> dict:
+        return {
+            "location_id": loc.location_id,
+            "name": loc.name,
+            "category": loc.category,
+            "wing_name": loc.wing_name,
+            "floor_level": loc.floor_level,
+        }
+
+    return {
+        "never_scheduled": [_fmt(l) for l in never_scheduled],
+        "currently_free": [_fmt(l) for l in currently_free],
+        "total_free": len(never_scheduled) + len(currently_free),
+    }
+
+
+@router.get("/resources/locations")
+def list_all_locations(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Return all active campus locations for navigation dropdowns."""
+    locs = db.query(Location).filter(Location.is_active.is_(True)).order_by(Location.name).all()
+    return {
+        "locations": [
+            {
+                "location_id": l.location_id,
+                "name": l.name,
+                "category": l.category,
+                "wing_name": l.wing_name,
+                "floor_level": l.floor_level,
+                "is_active": l.is_active,
+            }
+            for l in locs
+        ]
+    }

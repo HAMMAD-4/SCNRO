@@ -9,10 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.auth_utils import get_current_user, require_role
 from app.database import get_db
-from app.models import ItemLostFound
+from app.models import ItemLostFound, User
 
 router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
+
+# Max size for a closure photo stored as a base64 data URL (~5 MB raw → ~7 MB encoded)
+_MAX_CLOSURE_PHOTO_BYTES = 7_000_000
 
 
 # ---------------------------------------------------------------------------
@@ -21,7 +25,11 @@ router = APIRouter(prefix="/api/v1", tags=["Lost & Found"])
 
 
 class ItemReportRequest(BaseModel):
-    user_id: int = Field(..., description="ID of the reporting user")
+    """Schema for reporting a lost or found item.
+    
+    Authentication is handled via JWT — the user_id is automatically extracted
+    from the Bearer token. No need to supply user_id in the request body.
+    """
     item_name: str = Field(..., max_length=100)
     description: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=255)
@@ -44,10 +52,14 @@ class ItemReportResponse(BaseModel):
 
 
 @router.post("/items/report", response_model=ItemReportResponse, status_code=201)
-def report_item(payload: ItemReportRequest, db: Session = Depends(get_db)):
+def report_item(
+    payload: ItemReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Report a lost or found item on the community board."""
     item = ItemLostFound(
-        user_id=payload.user_id,
+        user_id=current_user.user_id,
         item_name=payload.item_name,
         description=payload.description,
         image_url=payload.image_url,
@@ -64,12 +76,13 @@ def report_item(payload: ItemReportRequest, db: Session = Depends(get_db)):
 def list_items(
     status: Optional[str] = Query(None, description="Filter by status: Lost, Found, Claimed"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List all lost & found items, optionally filtered by status."""
     query = db.query(ItemLostFound)
     if status:
-        if status not in ("Lost", "Found", "Claimed"):
-            raise HTTPException(status_code=400, detail="status must be one of: Lost, Found, Claimed")
+        if status not in ("Lost", "Found", "Claimed", "Closed"):
+            raise HTTPException(status_code=400, detail="status must be one of: Lost, Found, Claimed, Closed")
         query = query.filter(ItemLostFound.status == status)
 
     items = query.order_by(ItemLostFound.created_at.desc()).all()
@@ -91,7 +104,11 @@ def list_items(
 
 
 @router.patch("/items/{item_id}/claim")
-def claim_item(item_id: int, db: Session = Depends(get_db)):
+def claim_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Mark an item as claimed."""
     item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
     if not item:
@@ -100,3 +117,71 @@ def claim_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(item)
     return {"item_id": item.item_id, "status": item.status}
+
+
+class CloseItemRequest(BaseModel):
+    """Body for closing a lost & found item.
+
+    closure_photo must be a base64-encoded data URL (e.g. ``data:image/jpeg;base64,...``)
+    captured live via the browser webcam.  Admin-only access to view it.
+    """
+    closure_photo: str = Field(
+        ...,
+        description="Base64 data URL of a live webcam photo taken at closure",
+    )
+
+
+@router.patch("/items/{item_id}/close")
+def close_item(
+    item_id: int,
+    payload: CloseItemRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "sac")),
+):
+    """Mark a lost & found report as Closed.
+
+    Requires a live webcam photo (base64 data URL) as proof.
+    The photo is stored and only accessible to admin users.
+    SAC officers and admins may close items.
+    """
+    item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if item.status == "Closed":
+        raise HTTPException(status_code=400, detail="Item already closed.")
+    if not payload.closure_photo or not payload.closure_photo.startswith("data:image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="A valid live webcam photo (data URL) is required to close this item.",
+        )
+    # Rough size check: base64 data URL should not exceed ~5 MB
+    if len(payload.closure_photo) > _MAX_CLOSURE_PHOTO_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail="Closure photo is too large (max ~5 MB).",
+        )
+    item.status = "Closed"
+    item.closed_by = current_user.user_id
+    item.closure_photo = payload.closure_photo
+    db.commit()
+    db.refresh(item)
+    return {"item_id": item.item_id, "status": item.status}
+
+
+@router.get("/items/{item_id}/closure-photo")
+def get_closure_photo(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Return the closure proof photo for a closed item (admin only)."""
+    item = db.query(ItemLostFound).filter(ItemLostFound.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    if item.status != "Closed":
+        raise HTTPException(status_code=400, detail="Item is not closed yet.")
+    return {
+        "item_id": item.item_id,
+        "closure_photo": item.closure_photo,
+        "closed_by": item.closed_by,
+    }
